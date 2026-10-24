@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <meta
+      name="description"
+      content="자주 찾는 사이트를 한곳에서 관리하고 빠르게 검색할 수 있는 개인용 시작 페이지입니다."
+    />
+    <title>My Start Page</title>
+    <script>
+      try {
+        const raw = localStorage.getItem('my-start-page.settings.v1')
+        if (raw) {
+          const stored = JSON.parse(raw)
+          if (stored && stored.theme === 'dark') {
+            document.documentElement.dataset.theme = 'dark'
+          }
+        }
+      } catch {
+        // The app falls back to the light theme when stored settings are unavailable.
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
