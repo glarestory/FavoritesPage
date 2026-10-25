@@ -517,22 +517,82 @@ input:focus-visible {
 }
 
 .category-tabs {
+  position: relative;
+  z-index: 5;
   display: flex;
   flex: 1;
   min-width: 0;
   gap: 3px;
-  overflow-x: auto;
   padding: 3px;
   border: 1px solid var(--app-field-border);
   border-radius: 14px;
   background: var(--app-field-bg);
   box-shadow: var(--shadow-xs);
-  scrollbar-width: none;
   backdrop-filter: blur(12px);
 }
 
-.category-tabs::-webkit-scrollbar {
-  display: none;
+.category-tablist {
+  display: flex;
+  min-width: 0;
+  gap: 3px;
+}
+
+.category-tabs-measure {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: 3px;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.category-more {
+  position: relative;
+  flex: none;
+}
+
+.category-more-label {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.category-more-chevron {
+  flex: none;
+  margin-right: -3px;
+  transition: transform var(--duration) var(--ease);
+}
+
+.category-more-trigger[aria-expanded='true'] .category-more-chevron {
+  transform: rotate(180deg);
+}
+
+.category-more-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: -3px;
+  z-index: 40;
+  width: 220px;
+  max-height: min(360px, 60vh);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+  animation: menu-in 0.14s var(--ease);
+}
+
+.category-more-menu .card-menu-item {
+  gap: 8px;
+}
+
+.category-more-menu .card-menu-item.is-current .category-count {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .category-tab {

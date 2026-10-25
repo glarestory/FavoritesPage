@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { KeyboardEvent } from 'react'
 import type { Category, Favorite } from '../types'
 import {
@@ -5,7 +6,10 @@ import {
   ALL_CATEGORY_LABEL,
   getCategoryCounts,
 } from '../lib/categories'
-import { TagIcon } from './Icons'
+import { useVisibleTabCount } from '../hooks/useVisibleTabCount'
+import { CategoryOverflowMenu } from './CategoryOverflowMenu'
+import type { CategoryTabItem } from './CategoryOverflowMenu'
+import { ChevronDownIcon, TagIcon } from './Icons'
 
 interface CategoryBarProps {
   categories: Category[]
@@ -22,8 +26,10 @@ export function CategoryBar({
   onSelectCategory,
   onManageCategories,
 }: CategoryBarProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const measureRef = useRef<HTMLDivElement>(null)
   const counts = getCategoryCounts(favorites)
-  const tabs = [
+  const tabs: CategoryTabItem[] = [
     { id: ALL_CATEGORY_ID, name: ALL_CATEGORY_LABEL, count: favorites.length },
     ...categories.map((category) => ({
       id: category.id,
@@ -31,18 +37,25 @@ export function CategoryBar({
       count: counts.get(category.id) ?? 0,
     })),
   ]
+  const activeTab = tabs.find((tab) => tab.id === activeCategoryId)
+  const layoutKey = `${tabs.map((tab) => `${tab.name}:${tab.count}`).join('|')}#${activeTab?.id ?? ''}`
+  const visibleCount = useVisibleTabCount(containerRef, measureRef, tabs.length, layoutKey)
+  const visibleTabs = tabs.slice(0, visibleCount)
+  const overflowTabs = tabs.slice(visibleCount)
+  const hasActiveVisible = visibleTabs.some((tab) => tab.id === activeCategoryId)
 
   const handleTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return
     event.preventDefault()
 
+    const lastIndex = visibleTabs.length - 1
     let nextIndex = index
-    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length
-    else if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length
+    if (event.key === 'ArrowLeft') nextIndex = index === 0 ? lastIndex : index - 1
+    else if (event.key === 'ArrowRight') nextIndex = index === lastIndex ? 0 : index + 1
     else if (event.key === 'Home') nextIndex = 0
-    else if (event.key === 'End') nextIndex = tabs.length - 1
+    else if (event.key === 'End') nextIndex = lastIndex
 
-    const nextTab = tabs[nextIndex]
+    const nextTab = visibleTabs[nextIndex]
     if (!nextTab) return
     onSelectCategory(nextTab.id)
     window.requestAnimationFrame(() => {
@@ -52,29 +65,58 @@ export function CategoryBar({
 
   return (
     <div className="category-bar">
-      <div className="category-tabs" role="tablist" aria-label="즐겨찾기 카테고리">
-        {tabs.map((tab, index) => {
-          const isActive = activeCategoryId === tab.id
-          return (
-            <button
-              key={tab.id}
-              id={`category-tab-${tab.id}`}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              aria-controls="favorites-panel"
-              tabIndex={isActive ? 0 : -1}
-              className={`category-tab ${isActive ? 'is-active' : ''}`}
-              onClick={() => onSelectCategory(tab.id)}
-              onKeyDown={(event) => handleTabKeyDown(event, index)}
-            >
+      <div ref={containerRef} className="category-tabs">
+        <div className="category-tablist" role="tablist" aria-label="즐겨찾기 카테고리">
+          {visibleTabs.map((tab, index) => {
+            const isActive = activeCategoryId === tab.id
+            const isFocusable = isActive || (!hasActiveVisible && index === 0)
+            return (
+              <button
+                key={tab.id}
+                id={`category-tab-${tab.id}`}
+                type="button"
+                role="tab"
+                aria-selected={isActive}
+                aria-controls="favorites-panel"
+                tabIndex={isFocusable ? 0 : -1}
+                className={`category-tab ${isActive ? 'is-active' : ''}`}
+                onClick={() => onSelectCategory(tab.id)}
+                onKeyDown={(event) => handleTabKeyDown(event, index)}
+              >
+                <span>{tab.name}</span>
+                <span className="category-count" aria-hidden="true">
+                  {tab.count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+        {overflowTabs.length > 0 && (
+          <CategoryOverflowMenu
+            items={overflowTabs}
+            activeCategoryId={activeCategoryId}
+            onSelectCategory={onSelectCategory}
+          />
+        )}
+        <div ref={measureRef} className="category-tabs-measure" aria-hidden="true">
+          {tabs.map((tab) => (
+            <span key={tab.id} className="category-tab" data-measure="tab">
               <span>{tab.name}</span>
-              <span className="category-count" aria-hidden="true">
-                {tab.count}
-              </span>
-            </button>
-          )
-        })}
+              <span className="category-count">{tab.count}</span>
+            </span>
+          ))}
+          <span className="category-tab category-more-trigger" data-measure="more">
+            <span>더보기</span>
+            <ChevronDownIcon size={14} className="category-more-chevron" />
+          </span>
+          {activeTab && activeTab.id !== ALL_CATEGORY_ID && (
+            <span className="category-tab category-more-trigger" data-measure="more">
+              <span className="category-more-label">{activeTab.name}</span>
+              <span className="category-count">{activeTab.count}</span>
+              <ChevronDownIcon size={14} className="category-more-chevron" />
+            </span>
+          )}
+        </div>
       </div>
       <button
         type="button"
