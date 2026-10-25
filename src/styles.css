@@ -1715,6 +1715,53 @@ input:focus-visible {
   background: var(--surface-muted);
 }
 
+.category-row.is-draggable {
+  position: relative;
+  padding-left: 4px;
+  cursor: grab;
+}
+
+.category-row.is-draggable:active {
+  cursor: grabbing;
+}
+
+.category-row.is-dragging {
+  opacity: 0.42;
+}
+
+.category-row.is-drop-before::before,
+.category-row.is-drop-after::after {
+  content: '';
+  position: absolute;
+  right: 6px;
+  left: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+.category-row.is-drop-before::before {
+  top: -5px;
+}
+
+.category-row.is-drop-after::after {
+  bottom: -5px;
+}
+
+.category-row-grip {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 16px;
+  margin-right: -4px;
+  color: var(--text-subtle);
+}
+
+.category-row.is-draggable:hover .category-row-grip {
+  color: var(--text-muted);
+}
+
 .category-row.is-editing,
 .category-row.is-deleting {
   flex-wrap: wrap;

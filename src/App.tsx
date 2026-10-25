@@ -34,6 +34,7 @@ import {
   saveFavorites,
   saveSettings,
 } from './lib/storage'
+import { moveItemToTarget } from './lib/reorder.mjs'
 import { isDuplicateUrl, validateWebUrl } from './lib/url'
 import { Header } from './components/Header'
 import { SearchBar } from './components/SearchBar'
@@ -72,21 +73,6 @@ function loadInitialState(): InitialState {
       settingsResult.error,
     ].filter((error): error is string => Boolean(error)),
   }
-}
-
-function moveFavoriteToTarget(
-  current: Favorite[],
-  sourceId: string,
-  targetId: string,
-): Favorite[] {
-  const from = current.findIndex((favorite) => favorite.id === sourceId)
-  const to = current.findIndex((favorite) => favorite.id === targetId)
-  if (from < 0 || to < 0 || from === to) return current
-  const next = [...current]
-  const [moved] = next.splice(from, 1)
-  if (!moved) return current
-  next.splice(to, 0, moved)
-  return next
 }
 
 export default function App() {
@@ -293,7 +279,7 @@ export default function App() {
   }
 
   const handleReorder = (sourceId: string, targetId: string) => {
-    setFavorites((current) => moveFavoriteToTarget(current, sourceId, targetId))
+    setFavorites((current) => moveItemToTarget(current, sourceId, targetId))
   }
 
   const handleMoveFavorite = (favoriteId: string, direction: -1 | 1) => {
@@ -307,7 +293,7 @@ export default function App() {
       const index = pool.findIndex((favorite) => favorite.id === favoriteId)
       const target = index >= 0 ? pool[index + direction] : undefined
       if (!target) return current
-      return moveFavoriteToTarget(current, favoriteId, target.id)
+      return moveItemToTarget(current, favoriteId, target.id)
     })
   }
 
@@ -375,6 +361,10 @@ export default function App() {
       next.splice(to, 0, moved)
       return next
     })
+  }
+
+  const handleReorderCategory = (sourceId: string, targetId: string) => {
+    setCategories((current) => moveItemToTarget(current, sourceId, targetId))
   }
 
   const confirmDelete = () => {
@@ -589,6 +579,7 @@ export default function App() {
           onRename={handleRenameCategory}
           onDelete={handleDeleteCategory}
           onMove={handleMoveCategory}
+          onReorder={handleReorderCategory}
           onClose={() => setOverlay(null)}
         />
       )}

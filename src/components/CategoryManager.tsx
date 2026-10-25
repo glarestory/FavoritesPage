@@ -9,11 +9,13 @@ import {
   normalizeCategoryName,
   validateCategoryName,
 } from '../lib/categories'
+import { useDragReorder } from '../hooks/useDragReorder'
 import { Dialog } from './Dialog'
 import {
   AlertTriangleIcon,
   ChevronDownIcon,
   ChevronUpIcon,
+  GripVerticalIcon,
   PencilIcon,
   PlusIcon,
   TagIcon,
@@ -27,6 +29,7 @@ interface CategoryManagerProps {
   onRename: (id: string, name: string) => void
   onDelete: (id: string) => void
   onMove: (id: string, direction: -1 | 1) => void
+  onReorder: (sourceId: string, targetId: string) => void
   onClose: () => void
 }
 
@@ -37,6 +40,7 @@ export function CategoryManager({
   onRename,
   onDelete,
   onMove,
+  onReorder,
   onClose,
 }: CategoryManagerProps) {
   const [newName, setNewName] = useState('')
@@ -48,6 +52,8 @@ export function CategoryManager({
   const newNameRef = useRef<HTMLInputElement>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
+  const { draggedId, dragOverId, getRowProps } = useDragReorder<HTMLLIElement>(onReorder)
+  const draggedIndex = categories.findIndex((category) => category.id === draggedId)
   const counts = useMemo(() => getCategoryCounts(favorites), [favorites])
   const atLimit = categories.length >= MAX_CATEGORIES
   const deleteTarget = deleteId
@@ -194,7 +200,7 @@ export function CategoryManager({
 
         <div className="category-list-head">
           <p>카테고리 {categories.length}개</p>
-          <p>위·아래 버튼으로 탭 순서를 바꿀 수 있습니다.</p>
+          <p>끌어서 놓거나 위·아래 버튼으로 탭 순서를 바꿀 수 있습니다.</p>
         </div>
 
         <ul className="category-list">
@@ -204,17 +210,29 @@ export function CategoryManager({
             const isDeleting = deleteId === category.id
             const isFirst = index === 0
             const isLast = index === categories.length - 1
+            const canDrag = !isEditing && !isDeleting && categories.length > 1
+            const isDropTarget =
+              dragOverId === category.id && draggedId !== null && draggedId !== category.id
+            const dropClass = isDropTarget
+              ? index < draggedIndex
+                ? 'is-drop-before'
+                : 'is-drop-after'
+              : ''
 
             return (
               <li
                 key={category.id}
                 className={[
                   'category-row',
+                  canDrag ? 'is-draggable' : '',
                   isEditing ? 'is-editing' : '',
                   isDeleting ? 'is-deleting' : '',
+                  draggedId === category.id ? 'is-dragging' : '',
+                  dropClass,
                 ]
                   .filter(Boolean)
                   .join(' ')}
+                {...getRowProps(category.id, canDrag)}
               >
                 {isEditing ? (
                   <form className="category-edit-form" onSubmit={handleRename} noValidate>
@@ -264,6 +282,11 @@ export function CategoryManager({
                   </form>
                 ) : (
                   <>
+                    {canDrag && (
+                      <span className="category-row-grip" aria-hidden="true" title="끌어서 순서 변경">
+                        <GripVerticalIcon size={14} />
+                      </span>
+                    )}
                     <span className="category-row-icon" aria-hidden="true">
                       <TagIcon size={16} />
                     </span>
