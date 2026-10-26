@@ -23,6 +23,7 @@ import {
 } from './lib/categories'
 import { createDefaultSettings, createStarterFavorites } from './lib/defaults'
 import { createId } from './lib/id'
+import { getDefaultCategoryId } from './lib/default-category.mjs'
 import { resolveBackground } from './lib/background'
 import {
   loadCategories,
@@ -78,7 +79,9 @@ export default function App() {
   const [favorites, setFavorites] = useState<Favorite[]>(initial.favorites)
   const [categories, setCategories] = useState<Category[]>(initial.categories)
   const [settings, setSettings] = useState<Settings>(initial.settings)
-  const [activeCategoryId, setActiveCategoryId] = useState(ALL_CATEGORY_ID)
+  const [activeCategoryId, setActiveCategoryId] = useState(() =>
+    getDefaultCategoryId(initial.categories, ALL_CATEGORY_ID),
+  )
   const [filter, setFilter] = useState('')
   const [arranging, setArranging] = useState(false)
   const [overlay, setOverlay] = useState<OverlayState>(null)
@@ -158,7 +161,7 @@ export default function App() {
   useEffect(() => {
     if (activeCategoryId === ALL_CATEGORY_ID) return
     if (!categories.some((category) => category.id === activeCategoryId)) {
-      setActiveCategoryId(ALL_CATEGORY_ID)
+      setActiveCategoryId(getDefaultCategoryId(categories, ALL_CATEGORY_ID))
     }
   }, [categories, activeCategoryId])
 
@@ -361,9 +364,10 @@ export default function App() {
   }
 
   const handleRestoreDefaults = () => {
+    const nextCategories = createDefaultCategories()
     setFavorites(createStarterFavorites())
-    setCategories(createDefaultCategories())
-    setActiveCategoryId(ALL_CATEGORY_ID)
+    setCategories(nextCategories)
+    setActiveCategoryId(getDefaultCategoryId(nextCategories, ALL_CATEGORY_ID))
     pushToast('기본 즐겨찾기와 카테고리를 불러왔습니다.')
   }
 
@@ -427,10 +431,11 @@ export default function App() {
   }
 
   const handleReset = () => {
+    const nextCategories = createDefaultCategories()
     setFavorites(createStarterFavorites())
-    setCategories(createDefaultCategories())
+    setCategories(nextCategories)
     setSettings(createDefaultSettings())
-    setActiveCategoryId(ALL_CATEGORY_ID)
+    setActiveCategoryId(getDefaultCategoryId(nextCategories, ALL_CATEGORY_ID))
     setFilter('')
     setArranging(false)
     setOverlay(null)

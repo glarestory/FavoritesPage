@@ -229,11 +229,13 @@ src/
     bookmarks-core.d.mts     bookmarks-core TypeScript 선언
     page-titles.mjs          페이지 문구 정규화(공백·길이·기본값)
     category-drop.mjs        카드 드롭 가능한 카테고리 판정
+    default-category.mjs     기본 선택 카테고리(첫 번째 카테고리) 결정
   styles.css                 전체 레이아웃, 테마, 반응형 CSS
 tests/
   bookmarks.test.mjs         Chrome 북마크 파싱·중복·병합 테스트
   page-titles.test.mjs       페이지 문구 정규화 테스트
   category-drop.test.mjs     카테고리 드롭 판정 테스트
+  default-category.test.mjs  기본 선택 카테고리 테스트
 public/
   favicon.svg
   robots.txt
@@ -248,7 +250,7 @@ public/
 - 카테고리 관리와 카드의 카테고리 하위 메뉴는 키보드 포커스 이동과 `Esc` 닫기를 지원합니다.
 - `prefers-reduced-motion`을 존중합니다.
 - Lighthouse(데스크톱, 로컬 개발 서버 기준, 메인 화면 및 설정 → 데이터 탭): Accessibility 100, Best Practices 100, SEO 100
-- `npm test` 25개 테스트, `npm run typecheck`, `npm run build` 통과, 브라우저 콘솔 오류 없음
+- `npm test` 27개 테스트, `npm run typecheck`, `npm run build` 통과, 브라우저 콘솔 오류 없음
 - 검색, 카테고리 필터/추가·수정·삭제·순서 변경, 카테고리 이동, 즐겨찾기 추가/수정/삭제, 드래그 및 메뉴 이동, 필터, 테마/배경, 백업/복원, 초기화, 반응형 레이아웃을 직접 검증했습니다.
 - Chrome 북마크 HTML 미리보기, 폴더→카테고리 변환, 선택/전체 해제, 기존 URL 중복 유지, 잘못된 URL·빈 제목 처리, 기존 데이터 보존을 직접 검증했습니다.
 
@@ -261,6 +263,6 @@ public/
 - 이미지 배경은 외부 URL만 지원합니다. 로컬 파일 업로드는 지원하지 않습니다(외부 URL은 적용 전에 로드 여부를 확인합니다).
 - 모바일에서의 카드 드래그 정렬·그룹 이동은 브라우저별 편차가 있어 메뉴 이동 버튼을 권장합니다.
 - 카테고리는 최대 30개, 이름은 최대 20자까지 지원합니다. 카테고리는 최소 1개가 필요합니다.
-- 선택한 카테고리 탭은 새로고침하면 `전체`로 돌아갑니다. 카테고리 자체와 순서는 저장됩니다.
+- 처음 열거나 새로고침하면 `전체`를 제외한 첫 번째 카테고리가 선택됩니다. 선택한 탭 자체는 저장되지 않습니다. 카테고리 자체와 순서는 저장됩니다.
 - 즐겨찾기는 최대 300개까지 가져올 수 있고, 백업 파일은 5MB로 제한됩니다.
 - 검색 기록과 방문 통계는 제공하지 않습니다.
