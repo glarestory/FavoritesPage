@@ -6,6 +6,7 @@ import {
   ALL_CATEGORY_LABEL,
   getCategoryCounts,
 } from '../lib/categories'
+import { useCategoryDrop } from '../hooks/useCategoryDrop'
 import { useVisibleTabCount } from '../hooks/useVisibleTabCount'
 import { CategoryOverflowMenu } from './CategoryOverflowMenu'
 import type { CategoryTabItem } from './CategoryOverflowMenu'
@@ -17,6 +18,8 @@ interface CategoryBarProps {
   activeCategoryId: string
   onSelectCategory: (categoryId: string) => void
   onManageCategories: () => void
+  draggingCategoryId: string | null
+  onDropFavorite: (categoryId: string) => void
 }
 
 export function CategoryBar({
@@ -25,7 +28,10 @@ export function CategoryBar({
   activeCategoryId,
   onSelectCategory,
   onManageCategories,
+  draggingCategoryId,
+  onDropFavorite,
 }: CategoryBarProps) {
+  const { isDragging, getDropProps } = useCategoryDrop(draggingCategoryId, onDropFavorite)
   const containerRef = useRef<HTMLDivElement>(null)
   const measureRef = useRef<HTMLDivElement>(null)
   const counts = getCategoryCounts(favorites)
@@ -70,6 +76,8 @@ export function CategoryBar({
           {visibleTabs.map((tab, index) => {
             const isActive = activeCategoryId === tab.id
             const isFocusable = isActive || (!hasActiveVisible && index === 0)
+            const { className: dropClassName = '', ...dropHandlers } =
+              getDropProps(tab.id) ?? {}
             return (
               <button
                 key={tab.id}
@@ -79,9 +87,10 @@ export function CategoryBar({
                 aria-selected={isActive}
                 aria-controls="favorites-panel"
                 tabIndex={isFocusable ? 0 : -1}
-                className={`category-tab ${isActive ? 'is-active' : ''}`}
+                className={`category-tab ${isActive ? 'is-active' : ''} ${dropClassName}`}
                 onClick={() => onSelectCategory(tab.id)}
                 onKeyDown={(event) => handleTabKeyDown(event, index)}
+                {...dropHandlers}
               >
                 <span>{tab.name}</span>
                 <span className="category-count" aria-hidden="true">
@@ -96,6 +105,8 @@ export function CategoryBar({
             items={overflowTabs}
             activeCategoryId={activeCategoryId}
             onSelectCategory={onSelectCategory}
+            isDragging={isDragging}
+            getDropProps={getDropProps}
           />
         )}
         <div ref={measureRef} className="category-tabs-measure" aria-hidden="true">

@@ -265,12 +265,3 @@ export function LinkIcon(props: IconProps) {
     </Icon>
   )
 }
-
-export function CloudIcon(props: IconProps) {
-  return (
-    <Icon {...props}>
-      <path d="M7.5 18.5h9.2a3.8 3.8 0 0 0 .6-7.55 5.8 5.8 0 0 0-11.2-1.2A4.4 4.4 0 0 0 7.5 18.5Z" />
-      <path d="M12 13v5M9.8 15.2 12 13l2.2 2.2" />
-    </Icon>
-  )
-}

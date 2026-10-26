@@ -132,6 +132,15 @@ export function FavoritesGrid({
     setDragOverId(null)
   }
 
+  const draggingCategoryId =
+    allFavorites.find((favorite) => favorite.id === draggedId)?.categoryId ?? null
+
+  const handleDropOnCategory = (categoryId: string) => {
+    if (draggedId) onMoveToCategory(draggedId, categoryId)
+    setDraggedId(null)
+    setDragOverId(null)
+  }
+
   const closeMenu = () => setMenuOpenId(null)
 
   const focusTrigger = (favoriteId: string) => {
@@ -196,6 +205,8 @@ export function FavoritesGrid({
         activeCategoryId={activeCategoryId}
         onSelectCategory={onSelectCategory}
         onManageCategories={onManageCategories}
+        draggingCategoryId={draggingCategoryId}
+        onDropFavorite={handleDropOnCategory}
       />
 
       <div

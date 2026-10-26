@@ -12,6 +12,7 @@ import {
   normalizeCategoryName,
 } from './categories'
 import { createDefaultSettings, DEFAULT_FAVORITES, STORAGE_KEYS } from './defaults'
+import { normalizePageTitle } from './page-titles.mjs'
 import { createId } from './id'
 import { validateWebUrl } from './url'
 
@@ -209,6 +210,8 @@ function sanitizeSettings(value: unknown): Settings {
     searchEngine,
     background: sanitizeBackground(value.background),
     openInNewTab: typeof value.openInNewTab === 'boolean' ? value.openInNewTab : false,
+    siteTitle: normalizePageTitle(value.siteTitle, defaults.siteTitle),
+    heroTitle: normalizePageTitle(value.heroTitle, defaults.heroTitle),
   }
 }
 

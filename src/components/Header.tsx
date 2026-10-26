@@ -2,12 +2,13 @@ import type { ThemeMode } from '../types'
 import { GridIcon, MoonIcon, SettingsIcon, SunIcon } from './Icons'
 
 interface HeaderProps {
+  title: string
   theme: ThemeMode
   onToggleTheme: () => void
   onOpenSettings: () => void
 }
 
-export function Header({ theme, onToggleTheme, onOpenSettings }: HeaderProps) {
+export function Header({ title, theme, onToggleTheme, onOpenSettings }: HeaderProps) {
   const isLight = theme === 'light'
 
   return (
@@ -16,7 +17,7 @@ export function Header({ theme, onToggleTheme, onOpenSettings }: HeaderProps) {
         <span className="brand-mark" aria-hidden="true">
           <GridIcon size={18} />
         </span>
-        <span className="brand-name">My Start Page</span>
+        <span className="brand-name">{title}</span>
       </div>
       <div className="header-actions">
         <button

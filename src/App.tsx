@@ -9,10 +9,8 @@ import type {
 } from './types'
 import type { ImportedData } from './lib/backup'
 import type { BookmarkImportOutcome, BookmarkImportRequest } from './lib/bookmarks'
-import type { SyncData } from './lib/api'
 import { downloadBackup } from './lib/backup'
 import { planBookmarkImport } from './lib/bookmarks'
-import { useSync } from './hooks/useSync'
 import {
   ALL_CATEGORY_ID,
   createCategory,
@@ -105,26 +103,6 @@ export default function App() {
     setToasts((current) => current.filter((toast) => toast.id !== id))
   }, [])
 
-  const handleApplyRemote = useCallback(
-    (data: SyncData) => {
-      setFavorites(data.favorites)
-      setCategories(data.categories)
-      setSettings(data.settings)
-      setActiveCategoryId(ALL_CATEGORY_ID)
-      setFilter('')
-      setArranging(false)
-      pushToast('서버에서 동기화된 데이터를 불러왔습니다.', 'info')
-    },
-    [pushToast],
-  )
-
-  const sync = useSync({
-    favorites,
-    categories,
-    settings,
-    onApplyRemote: handleApplyRemote,
-  })
-
   useEffect(() => {
     if (initialErrorsShown.current) return
     initialErrorsShown.current = true
@@ -136,6 +114,10 @@ export default function App() {
     document.documentElement.style.colorScheme = settings.theme
     document.body.style.backgroundColor = settings.theme === 'dark' ? '#0b111b' : '#eef3fb'
   }, [settings.theme])
+
+  useEffect(() => {
+    document.title = settings.siteTitle
+  }, [settings.siteTitle])
 
   useEffect(() => {
     const error = saveFavorites(favorites)
@@ -471,6 +453,7 @@ export default function App() {
       </a>
 
       <Header
+        title={settings.siteTitle}
         theme={settings.theme}
         onToggleTheme={toggleTheme}
         onOpenSettings={() => openSettings('general')}
@@ -479,7 +462,7 @@ export default function App() {
       <main id="main-content" className="home">
         <section className="hero" aria-labelledby="home-title">
           <h1 id="home-title" className="hero-title">
-            My Homepage
+            {settings.heroTitle}
           </h1>
           <p className="hero-subtitle">원하는 사이트를 빠르게 찾아보세요</p>
           <SearchBar
@@ -538,7 +521,7 @@ export default function App() {
           className="footer-link"
           onClick={() => openSettings('data')}
         >
-          데이터 · 동기화
+          데이터 관리
         </button>
       </footer>
 
@@ -589,7 +572,6 @@ export default function App() {
           settings={settings}
           favorites={favorites}
           categories={categories}
-          sync={sync}
           initialTab={overlay.tab}
           onPatchSettings={patchSettings}
           onExport={handleExport}

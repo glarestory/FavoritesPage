@@ -36,6 +36,8 @@ export interface Settings {
   searchEngine: SearchEngineId
   background: BackgroundSettings
   openInNewTab: boolean
+  siteTitle: string
+  heroTitle: string
 }
 
 export interface BackupFile {

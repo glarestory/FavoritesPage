@@ -12,6 +12,7 @@ import {
   normalizeCategoryName,
 } from './categories'
 import { createDefaultSettings } from './defaults'
+import { normalizePageTitle } from './page-titles.mjs'
 import { createId } from './id'
 import { getSearchEngine } from './search'
 import { canonicalUrl, validateWebUrl } from './url'
@@ -263,6 +264,13 @@ function parseImportedSettings(raw: unknown): Settings | { error: string } | und
     return { error: '새 탭 열기 설정은 true 또는 false여야 합니다.' }
   }
 
+  if (raw.siteTitle !== undefined && typeof raw.siteTitle !== 'string') {
+    return { error: '사이트 이름은 문자열이어야 합니다.' }
+  }
+  if (raw.heroTitle !== undefined && typeof raw.heroTitle !== 'string') {
+    return { error: '메인 제목은 문자열이어야 합니다.' }
+  }
+
   const background = parseImportedBackground(raw.background)
   if ('error' in background) return background
 
@@ -272,6 +280,8 @@ function parseImportedSettings(raw: unknown): Settings | { error: string } | und
     background,
     openInNewTab:
       typeof raw.openInNewTab === 'boolean' ? raw.openInNewTab : defaults.openInNewTab,
+    siteTitle: normalizePageTitle(raw.siteTitle, defaults.siteTitle),
+    heroTitle: normalizePageTitle(raw.heroTitle, defaults.heroTitle),
   }
 }
 

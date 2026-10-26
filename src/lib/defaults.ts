@@ -29,6 +29,8 @@ export const DEFAULT_SETTINGS: Settings = {
   searchEngine: 'google',
   background: { type: 'default' },
   openInNewTab: false,
+  siteTitle: 'My Start Page',
+  heroTitle: 'My Homepage',
 }
 
 export function createStarterFavorites(): Favorite[] {

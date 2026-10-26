@@ -16,7 +16,6 @@ import type {
   BookmarkImportOutcome,
   BookmarkImportRequest,
 } from '../lib/bookmarks'
-import type { SyncController } from '../hooks/useSync'
 import { parseBackup } from '../lib/backup'
 import {
   COLOR_SWATCHES,
@@ -26,8 +25,8 @@ import {
 import { SEARCH_ENGINES } from '../lib/search'
 import { validateWebUrl } from '../lib/url'
 import { Dialog } from './Dialog'
-import { SyncPanel } from './SyncPanel'
 import { BookmarkImportPanel } from './BookmarkImportPanel'
+import { PageTitleFields } from './PageTitleFields'
 import {
   AlertTriangleIcon,
   CheckIcon,
@@ -46,7 +45,6 @@ interface SettingsPanelProps {
   settings: Settings
   favorites: Favorite[]
   categories: Category[]
-  sync: SyncController
   initialTab: SettingsTab
   onPatchSettings: (patch: Partial<Settings>) => void
   onExport: () => void
@@ -91,7 +89,6 @@ export function SettingsPanel({
   settings,
   favorites,
   categories,
-  sync,
   initialTab,
   onPatchSettings,
   onExport,
@@ -300,6 +297,8 @@ export function SettingsPanel({
           aria-labelledby="settings-tab-general"
           className="settings-panel"
         >
+          <PageTitleFields settings={settings} onPatchSettings={onPatchSettings} />
+
           <fieldset className="settings-section">
             <legend>테마</legend>
             <p className="section-description">화면 밝기와 대비를 선택합니다.</p>
@@ -612,8 +611,6 @@ export function SettingsPanel({
           aria-labelledby="settings-tab-data"
           className="settings-panel"
         >
-          <SyncPanel sync={sync} favorites={favorites} categories={categories} />
-
           <BookmarkImportPanel
             favorites={favorites}
             categories={categories}
@@ -628,7 +625,7 @@ export function SettingsPanel({
               <h3>JSON으로 내보내기</h3>
               <p>
                 즐겨찾기 {favorites.length}개, 카테고리 {categories.length}개,
-                테마·검색 엔진·배경 설정을 파일로 저장합니다.
+                페이지 문구·테마·검색 엔진·배경 설정을 파일로 저장합니다.
               </p>
             </div>
             <button type="button" className="button button--secondary" onClick={onExport}>
@@ -768,8 +765,8 @@ export function SettingsPanel({
           </section>
 
           <p className="data-note">
-            모든 데이터는 기본적으로 이 브라우저의 localStorage에 저장됩니다. 로그인하면
-            서버와 동기화하거나 JSON 파일로 다른 기기에 옮길 수 있습니다.
+            모든 데이터는 이 브라우저의 localStorage에 저장됩니다. 다른 기기로 옮기려면
+            JSON 파일로 내보낸 뒤 가져오세요.
           </p>
         </div>
       )}
