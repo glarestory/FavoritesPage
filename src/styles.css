@@ -5371,3 +5371,43 @@ kbd {
     width: calc(100% - 28px);
   }
 }
+
+/* Chrome Extension Sync Card */
+
+.sync-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
+.sync-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sync-pill.is-syncing {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.sync-pill.is-error {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.sync-meta {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-now-button {
+  margin-left: auto;
+}

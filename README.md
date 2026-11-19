@@ -94,11 +94,24 @@ npm run dev
 npm run build
 ```
 
-- `npm run build`: 타입 검사(`tsc -b`) 후 프로덕션 빌드를 `dist/`에 생성합니다.
+- `npm run build`: 타입 검사(`tsc -b`) 후 웹 프로덕션 빌드를 `dist/`에 생성합니다.
+- `npm run build:extension`: Chrome 확장 프로그램(Manifest V3) 빌드를 `dist-extension/`에 생성합니다.
 - `npm run typecheck`: 타입 검사만 실행합니다.
 - `npm run preview`: 빌드 결과를 Vite 프리뷰 서버에서 확인합니다.
-- `npm test`: 북마크 가져오기, 순서 변경, 카테고리 드롭 등 로직 테스트를 실행합니다.
+- `npm test`: 북마크 가져오기, 순서 변경, 카테고리 드롭, 위젯, 확장 동기화 로직 테스트를 실행합니다.
 - `main` 브랜치에 푸시하면 GitHub Actions가 GitHub Pages로 배포합니다.
+
+### Chrome 확장 프로그램(새 탭 + 계정 동기화) 설치 방법
+
+1. 확장 빌드를 실행합니다:
+   ```bash
+   npm run build:extension
+   ```
+2. Chrome 주소창에 `chrome://extensions` 를 입력해 접속합니다.
+3. 우측 상단 **개발자 모드**를 켭니다.
+4. **압축해제된 확장 프로그램을 로드합니다**를 클릭하고 `dist-extension` 폴더를 선택합니다.
+5. 새 탭을 열면 바로 시작 페이지가 표시되며, 즐겨찾기·카테고리·설정·위젯(캘린더 메모·D-Day·빠른 메모·포모도로)은 로그인된 Chrome 계정(`chrome.storage.sync`)으로 자동 동기화됩니다.
+   - **로컬 배경 이미지와 로컬 업로드 아이콘**은 용량 제한(100KB)을 피하기 위해 현재 기기 전용 저장소(`chrome.storage.local`)에 보관됩니다.
 
 ## 사용 방법
 
@@ -236,6 +249,8 @@ src/
     favorite-icon.mjs        favicon 후보·회색 지구본 감지·모노그램·커스텀 아이콘 검증
     selection.mjs            다중 선택·일괄 삭제·카테고리 일괄 이동 로직
     widgets.mjs              미니 캘린더·D-Day·메모·포모도로 순수 로직 및 검증
+    extension-sync-core.mjs  Chrome storage.sync 청킹·로컬 미디어 분리/병합 로직
+    chrome-storage.ts        Chrome 확장 storage.sync/local 어댑터 및 변경 구독
     local-image.ts           로컬 배경·아이콘 이미지 디코딩 및 Canvas 최적화
     backup.ts                JSON 백업 내보내기/검증(버전 2, 버전 1 호환)
     bookmarks.ts             Chrome 북마크 미리보기 타입과 병합 래퍼
@@ -250,6 +265,7 @@ tests/
   favorite-icon.test.mjs     favicon 폴백·회색 지구본 감지·모노그램·아이콘 검증 테스트
   selection.test.mjs         다중 선택·일괄 삭제·일괄 이동 테스트
   widgets.test.mjs           미니 캘린더·D-Day·타이머·위젯 데이터 정규화 테스트
+  extension-sync.test.mjs    Chrome 확장 동기화 청킹·분리/병합 테스트
   bookmarks.test.mjs         Chrome 북마크 파싱·중복·병합 테스트
   page-titles.test.mjs       페이지 문구 정규화 테스트
   category-drop.test.mjs     카테고리 드롭 판정 테스트
@@ -268,7 +284,7 @@ public/
 - 카테고리 관리와 카드의 카테고리 하위 메뉴는 키보드 포커스 이동과 `Esc` 닫기를 지원합니다.
 - `prefers-reduced-motion`을 존중합니다.
 - Lighthouse(데스크톱, 로컬 개발 서버 기준, 메인 화면 및 설정 → 데이터 탭): Accessibility 100, Best Practices 100, SEO 100
-- `npm test` 54개 테스트, `npm run typecheck`, `npm run build` 통과, 브라우저 콘솔 오류 없음
+- `npm test` 60개 테스트, `npm run typecheck`, `npm run build`, `npm run build:extension` 통과, 브라우저 콘솔 오류 없음
 - 검색, 카테고리 필터/추가·수정·삭제·순서 변경, 카테고리 이동, 즐겨찾기 추가/수정/삭제, 드래그 및 메뉴 이동, 필터, 테마/배경, 백업/복원, 초기화, 반응형 레이아웃을 직접 검증했습니다.
 - Chrome 북마크 HTML 미리보기, 폴더→카테고리 변환, 선택/전체 해제, 기존 URL 중복 유지, 잘못된 URL·빈 제목 처리, 기존 데이터 보존을 직접 검증했습니다.
 

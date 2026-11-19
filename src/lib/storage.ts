@@ -61,7 +61,7 @@ interface SanitizedFavorites {
   skipped: number
 }
 
-function sanitizeFavorites(value: unknown[], categories: Category[]): SanitizedFavorites {
+export function sanitizeFavorites(value: unknown[], categories: Category[]): SanitizedFavorites {
   const favorites: Favorite[] = []
   const usedIds = new Set<string>()
   const usedUrls = new Set<string>()
@@ -148,7 +148,7 @@ interface SanitizedCategories {
   skipped: number
 }
 
-function sanitizeCategories(value: unknown[]): SanitizedCategories {
+export function sanitizeCategories(value: unknown[]): SanitizedCategories {
   const categories: Category[] = []
   const usedIds = new Set<string>()
   const usedNames = new Set<string>()
@@ -240,7 +240,7 @@ function sanitizeBackground(value: unknown): BackgroundSettings {
   return { type: 'default' }
 }
 
-function sanitizeSettings(value: unknown): Settings {
+export function sanitizeSettings(value: unknown): Settings {
   const defaults = createDefaultSettings()
   if (!isRecord(value)) return defaults
 

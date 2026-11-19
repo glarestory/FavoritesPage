@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "My Start Page",
+  "version": "1.0.0",
+  "description": "검색, 카테고리별 즐겨찾기, 캘린더·D-Day·빠른 메모·포모도로 위젯과 Chrome 동기화를 지원하는 개인용 새 탭 페이지입니다.",
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

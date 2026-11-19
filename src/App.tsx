@@ -27,6 +27,13 @@ import { createId } from './lib/id'
 import { getDefaultCategoryId } from './lib/default-category.mjs'
 import { resolveBackground } from './lib/background'
 import {
+  isChromeExtensionEnvironment,
+  loadStateFromChromeStorage,
+  saveStateToChromeStorage,
+  subscribeChromeSyncChanges,
+} from './lib/chrome-storage'
+import { MAX_SYNC_TOTAL_BYTES } from './lib/extension-sync-core.mjs'
+import {
   loadCategories,
   loadFavorites,
   loadSettings,
@@ -117,6 +124,20 @@ export default function App() {
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [overlay, setOverlay] = useState<OverlayState>(null)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
+  const isChromeExtension = useMemo(() => isChromeExtensionEnvironment(), [])
+  const [chromeSyncInfo, setChromeSyncInfo] = useState<{
+    status: 'idle' | 'syncing' | 'synced' | 'error'
+    lastSyncedAt: number | null
+    usedBytes: number | null
+    maxBytes: number
+    error: string | null
+  }>({
+    status: isChromeExtension ? 'syncing' : 'idle',
+    lastSyncedAt: null,
+    usedBytes: null,
+    maxBytes: MAX_SYNC_TOTAL_BYTES,
+    error: null,
+  })
   const searchInputRef = useRef<HTMLInputElement>(null)
   const toastIdRef = useRef(0)
   const initialErrorsShown = useRef(false)
@@ -124,6 +145,11 @@ export default function App() {
   const categoriesSaveError = useRef<string | null>(null)
   const settingsSaveError = useRef<string | null>(null)
   const widgetsSaveError = useRef<string | null>(null)
+  const chromeSyncErrorRef = useRef<string | null>(null)
+  const syncClientIdRef = useRef<string>(createId('client'))
+  const chromeSyncHydratedRef = useRef<boolean>(!isChromeExtension)
+  const skipNextChromePushRef = useRef<boolean>(false)
+  const initialStateRef = useRef<InitialState>(initial)
 
   const pushToast = useCallback(
     (text: string, tone: ToastMessage['tone'] = 'success') => {
@@ -203,6 +229,138 @@ export default function App() {
       widgetsSaveError.current = null
     }
   }, [widgets, pushToast])
+
+  // Chrome 확장 환경: 초기 chrome.storage.sync 로드 및 다른 기기/탭 변경 구독
+  useEffect(() => {
+    if (!isChromeExtension) return
+    let cancelled = false
+
+    const hydrate = async () => {
+      const result = await loadStateFromChromeStorage()
+      if (cancelled) return
+
+      if (result.error) {
+        chromeSyncHydratedRef.current = true
+        setChromeSyncInfo((current) => ({
+          ...current,
+          status: 'error',
+          error: result.error,
+        }))
+        pushToast(result.error, 'error')
+        return
+      }
+
+      if (result.found && result.state) {
+        skipNextChromePushRef.current = true
+        setCategories(result.state.categories)
+        setFavorites(result.state.favorites)
+        setSettings(result.state.settings)
+        setWidgets(result.state.widgets)
+        chromeSyncHydratedRef.current = true
+        setChromeSyncInfo((current) => ({
+          ...current,
+          status: 'synced',
+          lastSyncedAt: result.updatedAt ?? Date.now(),
+          error: null,
+        }))
+      } else {
+        // 최초 실행 시 현재 기기의 데이터를 chrome.storage.sync에 초기 반영합니다.
+        const seed = initialStateRef.current
+        const saved = await saveStateToChromeStorage(
+          {
+            favorites: seed.favorites,
+            categories: seed.categories,
+            settings: seed.settings,
+            widgets: seed.widgets,
+          },
+          syncClientIdRef.current,
+        )
+        if (cancelled) return
+        chromeSyncHydratedRef.current = true
+        setChromeSyncInfo((current) => ({
+          ...current,
+          status: saved.ok ? 'synced' : 'error',
+          lastSyncedAt: saved.updatedAt ?? current.lastSyncedAt,
+          usedBytes: saved.totalBytes ?? current.usedBytes,
+          error: saved.error,
+        }))
+      }
+    }
+
+    void hydrate()
+
+    const unsubscribe = subscribeChromeSyncChanges(
+      syncClientIdRef.current,
+      (remoteState, updatedAt) => {
+        if (cancelled) return
+        skipNextChromePushRef.current = true
+        setCategories(remoteState.categories)
+        setFavorites(remoteState.favorites)
+        setSettings(remoteState.settings)
+        setWidgets(remoteState.widgets)
+        setChromeSyncInfo((current) => ({
+          ...current,
+          status: 'synced',
+          lastSyncedAt: updatedAt,
+          error: null,
+        }))
+        pushToast('다른 기기 또는 탭의 변경 사항을 동기화했습니다.', 'info')
+      },
+    )
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+    }
+  }, [isChromeExtension, pushToast])
+
+  // Chrome 확장 환경: 상태 변경 시 600ms 디바운스 후 chrome.storage.sync + local에 저장
+  useEffect(() => {
+    if (!isChromeExtension || !chromeSyncHydratedRef.current) return
+    if (skipNextChromePushRef.current) {
+      skipNextChromePushRef.current = false
+      return
+    }
+
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        setChromeSyncInfo((current) => ({ ...current, status: 'syncing' }))
+        const saved = await saveStateToChromeStorage(
+          { favorites, categories, settings, widgets },
+          syncClientIdRef.current,
+        )
+        if (cancelled) return
+
+        if (saved.ok) {
+          chromeSyncErrorRef.current = null
+          setChromeSyncInfo((current) => ({
+            ...current,
+            status: 'synced',
+            lastSyncedAt: saved.updatedAt ?? Date.now(),
+            usedBytes: saved.totalBytes ?? current.usedBytes,
+            error: null,
+          }))
+        } else {
+          setChromeSyncInfo((current) => ({
+            ...current,
+            status: 'error',
+            usedBytes: saved.totalBytes ?? current.usedBytes,
+            error: saved.error,
+          }))
+          if (saved.error && chromeSyncErrorRef.current !== saved.error) {
+            chromeSyncErrorRef.current = saved.error
+            pushToast(saved.error, 'error')
+          }
+        }
+      })()
+    }, 600)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [isChromeExtension, favorites, categories, settings, widgets, pushToast])
 
   useEffect(() => {
     if (activeCategoryId === ALL_CATEGORY_ID) return
@@ -601,6 +759,53 @@ export default function App() {
     [pushToast],
   )
 
+  const handleManualChromeSync = useCallback(async () => {
+    if (!isChromeExtension) return
+    setChromeSyncInfo((current) => ({ ...current, status: 'syncing', error: null }))
+    const result = await loadStateFromChromeStorage()
+    if (result.error) {
+      setChromeSyncInfo((current) => ({
+        ...current,
+        status: 'error',
+        error: result.error,
+      }))
+      pushToast(result.error, 'error')
+      return
+    }
+
+    if (result.found && result.state) {
+      skipNextChromePushRef.current = true
+      setCategories(result.state.categories)
+      setFavorites(result.state.favorites)
+      setSettings(result.state.settings)
+      setWidgets(result.state.widgets)
+      setChromeSyncInfo((current) => ({
+        ...current,
+        status: 'synced',
+        lastSyncedAt: result.updatedAt ?? Date.now(),
+        error: null,
+      }))
+      pushToast('Chrome 동기화 데이터를 최신 상태로 불러왔습니다.')
+    } else {
+      const saved = await saveStateToChromeStorage(
+        { favorites, categories, settings, widgets },
+        syncClientIdRef.current,
+      )
+      setChromeSyncInfo((current) => ({
+        ...current,
+        status: saved.ok ? 'synced' : 'error',
+        lastSyncedAt: saved.updatedAt ?? current.lastSyncedAt,
+        usedBytes: saved.totalBytes ?? current.usedBytes,
+        error: saved.error,
+      }))
+      if (saved.ok) {
+        pushToast('현재 데이터를 Chrome 계정에 동기화했습니다.')
+      } else if (saved.error) {
+        pushToast(saved.error, 'error')
+      }
+    }
+  }, [isChromeExtension, favorites, categories, settings, widgets, pushToast])
+
   const handleExport = () => {
     try {
       const filename = downloadBackup(favorites, categories, settings, widgets)
@@ -907,6 +1112,8 @@ export default function App() {
           favorites={favorites}
           categories={categories}
           initialTab={overlay.tab}
+          chromeSync={isChromeExtension ? chromeSyncInfo : null}
+          onSyncNow={isChromeExtension ? handleManualChromeSync : undefined}
           onPatchSettings={patchSettings}
           onExport={handleExport}
           onImport={handleImport}

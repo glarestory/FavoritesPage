@@ -50,11 +50,21 @@ import {
   UploadIcon,
 } from './Icons'
 
+export interface ChromeSyncDisplayInfo {
+  status: 'idle' | 'syncing' | 'synced' | 'error'
+  lastSyncedAt: number | null
+  usedBytes: number | null
+  maxBytes: number
+  error: string | null
+}
+
 interface SettingsPanelProps {
   settings: Settings
   favorites: Favorite[]
   categories: Category[]
   initialTab: SettingsTab
+  chromeSync?: ChromeSyncDisplayInfo | null
+  onSyncNow?: () => Promise<void>
   onPatchSettings: (patch: Partial<Settings>) => void
   onExport: () => void
   onImport: (data: ImportedData) => void
@@ -110,6 +120,8 @@ export function SettingsPanel({
   favorites,
   categories,
   initialTab,
+  chromeSync = null,
+  onSyncNow,
   onPatchSettings,
   onExport,
   onImport,
@@ -881,6 +893,64 @@ export function SettingsPanel({
           aria-labelledby="settings-tab-data"
           className="settings-panel"
         >
+          {chromeSync && (
+            <section className="data-card data-card--stacked" aria-label="Chrome 동기화 상태">
+              <div className="data-card-heading">
+                <span className="data-card-icon" aria-hidden="true">
+                  <DatabaseIcon size={20} />
+                </span>
+                <div className="data-card-copy">
+                  <h3>Chrome 계정 자동 동기화</h3>
+                  <p>
+                    즐겨찾기, 카테고리, 설정, 캘린더 메모, D-Day, 빠른 메모, 포모도로가
+                    로그인된 Chrome 계정으로 자동 동기화됩니다. 로컬 배경 이미지와 로컬
+                    아이콘은 현재 기기에만 보관됩니다.
+                  </p>
+                </div>
+              </div>
+              <div className="sync-status-row">
+                <span className={`sync-pill is-${chromeSync.status}`}>
+                  {chromeSync.status === 'syncing'
+                    ? '동기화 중...'
+                    : chromeSync.status === 'error'
+                      ? '동기화 오류'
+                      : '동기화 활성'}
+                </span>
+                {chromeSync.lastSyncedAt && (
+                  <span className="sync-meta">
+                    최근 동기화:{' '}
+                    {new Date(chromeSync.lastSyncedAt).toLocaleTimeString('ko-KR', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                )}
+                {chromeSync.usedBytes !== null && (
+                  <span className="sync-meta">
+                    {Math.round(chromeSync.usedBytes / 1024)}KB /{' '}
+                    {Math.round(chromeSync.maxBytes / 1024)}KB
+                  </span>
+                )}
+                {onSyncNow && (
+                  <button
+                    type="button"
+                    className="button button--secondary button--compact sync-now-button"
+                    disabled={chromeSync.status === 'syncing'}
+                    onClick={() => void onSyncNow()}
+                  >
+                    지금 동기화
+                  </button>
+                )}
+              </div>
+              {chromeSync.error && (
+                <div className="import-message import-message--error" role="alert">
+                  <AlertTriangleIcon size={17} />
+                  <p>{chromeSync.error}</p>
+                </div>
+              )}
+            </section>
+          )}
+
           <BookmarkImportPanel
             favorites={favorites}
             categories={categories}
@@ -1035,8 +1105,9 @@ export function SettingsPanel({
           </section>
 
           <p className="data-note">
-            모든 데이터는 이 브라우저의 localStorage에 저장됩니다. 다른 기기로 옮기려면
-            JSON 파일로 내보낸 뒤 가져오세요.
+            {chromeSync
+              ? '즐겨찾기·카테고리·설정·위젯은 Chrome 계정(chrome.storage.sync)으로 동기화되며, 로컬 배경 이미지와 로컬 아이콘은 현재 기기(chrome.storage.local)에 저장됩니다.'
+              : '모든 데이터는 이 브라우저의 localStorage에 저장됩니다. 다른 기기로 옮기려면 JSON 파일로 내보낸 뒤 가져오세요.'}
           </p>
         </div>
       )}
