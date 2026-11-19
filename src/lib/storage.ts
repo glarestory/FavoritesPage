@@ -1,4 +1,10 @@
-import type { BackgroundSettings, Category, Favorite, Settings } from '../types'
+import type {
+  BackgroundSettings,
+  Category,
+  Favorite,
+  Settings,
+  WidgetData,
+} from '../types'
 import { GRADIENT_PRESETS } from './background'
 import {
   normalizeBackgroundFileName,
@@ -8,6 +14,10 @@ import {
   normalizeIconEmoji,
   validateLocalIconDataUrl,
 } from './favorite-icon.mjs'
+import {
+  createDefaultWidgetData,
+  sanitizeWidgetData,
+} from './widgets.mjs'
 import {
   ALL_CATEGORY_ID,
   ALL_CATEGORY_LABEL,
@@ -250,6 +260,10 @@ function sanitizeSettings(value: unknown): Settings {
     openInNewTab: typeof value.openInNewTab === 'boolean' ? value.openInNewTab : false,
     siteTitle: normalizePageTitle(value.siteTitle, defaults.siteTitle),
     heroTitle: normalizePageTitle(value.heroTitle, defaults.heroTitle),
+    showSideWidgets:
+      typeof value.showSideWidgets === 'boolean'
+        ? value.showSideWidgets
+        : defaults.showSideWidgets,
   }
 }
 
@@ -424,5 +438,45 @@ export function saveSettings(settings: Settings): string | null {
       return '브라우저 저장 공간이 부족해 설정을 저장하지 못했습니다. 더 작은 배경 이미지를 선택해 주세요.'
     }
     return '설정을 저장하지 못했습니다. 브라우저 저장 공간을 확인해 주세요.'
+  }
+}
+
+export function loadWidgets(): LoadResult<WidgetData> {
+  const storage = getStorage()
+  if (!storage) {
+    return { value: createDefaultWidgetData(), error: null }
+  }
+
+  let raw: string | null
+  try {
+    raw = storage.getItem(STORAGE_KEYS.widgets)
+  } catch {
+    return {
+      value: createDefaultWidgetData(),
+      error: '저장된 위젯 데이터를 읽지 못했습니다.',
+    }
+  }
+
+  if (raw === null) return { value: createDefaultWidgetData(), error: null }
+
+  try {
+    const parsed: unknown = JSON.parse(raw)
+    return { value: sanitizeWidgetData(parsed), error: null }
+  } catch {
+    return {
+      value: createDefaultWidgetData(),
+      error: '저장된 위젯 데이터를 해석하지 못해 기본 상태로 복구했습니다.',
+    }
+  }
+}
+
+export function saveWidgets(widgets: WidgetData): string | null {
+  const storage = getStorage()
+  if (!storage) return '브라우저 저장소를 사용할 수 없어 위젯 데이터가 저장되지 않았습니다.'
+  try {
+    storage.setItem(STORAGE_KEYS.widgets, JSON.stringify(widgets))
+    return null
+  } catch {
+    return '위젯 데이터를 저장하지 못했습니다. 브라우저 저장 공간을 확인해 주세요.'
   }
 }

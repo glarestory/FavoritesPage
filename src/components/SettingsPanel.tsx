@@ -518,6 +518,28 @@ export function SettingsPanel({
                 <span className="switch-thumb" />
               </button>
             </div>
+            <div className="setting-row setting-row--divider">
+              <div>
+                <p id="side-widgets-label" className="setting-row-title">
+                  좌우 사이드 위젯 표시
+                </p>
+                <p className="setting-row-description">
+                  미니 캘린더, D-Day, 빠른 메모, 포모도로 타이머를 좌우 공간에 표시합니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="switch"
+                role="switch"
+                aria-checked={settings.showSideWidgets}
+                aria-labelledby="side-widgets-label"
+                onClick={() =>
+                  onPatchSettings({ showSideWidgets: !settings.showSideWidgets })
+                }
+              >
+                <span className="switch-thumb" />
+              </button>
+            </div>
           </div>
 
           <div className="shortcut-card">
@@ -873,7 +895,7 @@ export function SettingsPanel({
               <h3>JSON으로 내보내기</h3>
               <p>
                 즐겨찾기 {favorites.length}개, 카테고리 {categories.length}개,
-                페이지 문구·테마·검색 엔진·배경 설정을 파일로 저장합니다.
+                설정과 사이드 위젯(캘린더 메모·D-Day·빠른 메모)을 파일로 저장합니다.
               </p>
             </div>
             <button type="button" className="button button--secondary" onClick={onExport}>

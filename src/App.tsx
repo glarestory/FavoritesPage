@@ -6,6 +6,7 @@ import type {
   Settings,
   SettingsTab,
   ToastMessage,
+  WidgetData,
 } from './types'
 import type { ImportedData } from './lib/backup'
 import type { BookmarkImportOutcome, BookmarkImportRequest } from './lib/bookmarks'
@@ -29,10 +30,20 @@ import {
   loadCategories,
   loadFavorites,
   loadSettings,
+  loadWidgets,
   saveCategories,
   saveFavorites,
   saveSettings,
+  saveWidgets,
 } from './lib/storage'
+import {
+  createDefaultWidgetData,
+  MAX_CALENDAR_NOTE_LENGTH,
+  MAX_CALENDAR_NOTES,
+  MAX_DDAYS,
+  MAX_DDAY_TITLE_LENGTH,
+  MAX_MEMO_LENGTH,
+} from './lib/widgets.mjs'
 import { moveItemToTarget } from './lib/reorder.mjs'
 import {
   moveFavoritesToCategory,
@@ -50,11 +61,16 @@ import { CategoryManager } from './components/CategoryManager'
 import { SettingsPanel } from './components/SettingsPanel'
 import { ConfirmDialog } from './components/ConfirmDialog'
 import { ToastStack } from './components/Toast'
+import { MiniCalendarWidget } from './components/widgets/MiniCalendarWidget'
+import { DdayWidget } from './components/widgets/DdayWidget'
+import { QuickMemoWidget } from './components/widgets/QuickMemoWidget'
+import { PomodoroWidget } from './components/widgets/PomodoroWidget'
 
 interface InitialState {
   favorites: Favorite[]
   categories: Category[]
   settings: Settings
+  widgets: WidgetData
   errors: string[]
 }
 
@@ -70,14 +86,17 @@ function loadInitialState(): InitialState {
   const categoriesResult = loadCategories()
   const favoritesResult = loadFavorites(categoriesResult.value)
   const settingsResult = loadSettings()
+  const widgetsResult = loadWidgets()
   return {
     categories: categoriesResult.value,
     favorites: favoritesResult.value,
     settings: settingsResult.value,
+    widgets: widgetsResult.value,
     errors: [
       categoriesResult.error,
       favoritesResult.error,
       settingsResult.error,
+      widgetsResult.error,
     ].filter((error): error is string => Boolean(error)),
   }
 }
@@ -87,6 +106,8 @@ export default function App() {
   const [favorites, setFavorites] = useState<Favorite[]>(initial.favorites)
   const [categories, setCategories] = useState<Category[]>(initial.categories)
   const [settings, setSettings] = useState<Settings>(initial.settings)
+  const [widgets, setWidgets] = useState<WidgetData>(initial.widgets)
+  const [timerTitlePrefix, setTimerTitlePrefix] = useState<string | null>(null)
   const [activeCategoryId, setActiveCategoryId] = useState(() =>
     getDefaultCategoryId(initial.categories, ALL_CATEGORY_ID),
   )
@@ -102,6 +123,7 @@ export default function App() {
   const favoritesSaveError = useRef<string | null>(null)
   const categoriesSaveError = useRef<string | null>(null)
   const settingsSaveError = useRef<string | null>(null)
+  const widgetsSaveError = useRef<string | null>(null)
 
   const pushToast = useCallback(
     (text: string, tone: ToastMessage['tone'] = 'success') => {
@@ -129,8 +151,10 @@ export default function App() {
   }, [settings.theme])
 
   useEffect(() => {
-    document.title = settings.siteTitle
-  }, [settings.siteTitle])
+    document.title = timerTitlePrefix
+      ? `${timerTitlePrefix} · ${settings.siteTitle}`
+      : settings.siteTitle
+  }, [settings.siteTitle, timerTitlePrefix])
 
   useEffect(() => {
     const error = saveFavorites(favorites)
@@ -167,6 +191,18 @@ export default function App() {
       settingsSaveError.current = null
     }
   }, [settings, pushToast])
+
+  useEffect(() => {
+    const error = saveWidgets(widgets)
+    if (error) {
+      if (widgetsSaveError.current !== error) {
+        widgetsSaveError.current = error
+        pushToast(error, 'error')
+      }
+    } else {
+      widgetsSaveError.current = null
+    }
+  }, [widgets, pushToast])
 
   useEffect(() => {
     if (activeCategoryId === ALL_CATEGORY_ID) return
@@ -482,9 +518,92 @@ export default function App() {
     pushToast('기본 즐겨찾기와 카테고리를 불러왔습니다.')
   }
 
+  const handleSaveCalendarNote = useCallback((dateKey: string, note: string) => {
+    const trimmed = note.replace(/\s+/g, ' ').trim().slice(0, MAX_CALENDAR_NOTE_LENGTH)
+    setWidgets((current) => {
+      const nextNotes = { ...current.calendarNotes }
+      if (!trimmed) {
+        if (!(dateKey in nextNotes)) return current
+        delete nextNotes[dateKey]
+      } else {
+        if (!(dateKey in nextNotes) && Object.keys(nextNotes).length >= MAX_CALENDAR_NOTES) {
+          return current
+        }
+        nextNotes[dateKey] = trimmed
+      }
+      return { ...current, calendarNotes: nextNotes }
+    })
+  }, [])
+
+  const handleAddDday = useCallback(
+    (title: string, targetDate: string) => {
+      const normalized = title.replace(/\s+/g, ' ').trim().slice(0, MAX_DDAY_TITLE_LENGTH)
+      if (!normalized) return
+      setWidgets((current) => {
+        if (current.ddays.length >= MAX_DDAYS) return current
+        return {
+          ...current,
+          ddays: [
+            ...current.ddays,
+            {
+              id: createId('dday'),
+              title: normalized,
+              targetDate,
+              createdAt: Date.now(),
+            },
+          ],
+        }
+      })
+      pushToast(`“${normalized}” D-Day를 추가했습니다.`)
+    },
+    [pushToast],
+  )
+
+  const handleDeleteDday = useCallback((id: string) => {
+    setWidgets((current) => ({
+      ...current,
+      ddays: current.ddays.filter((item) => item.id !== id),
+    }))
+  }, [])
+
+  const handleChangeMemo = useCallback((value: string) => {
+    setWidgets((current) => ({
+      ...current,
+      memo: value.slice(0, MAX_MEMO_LENGTH),
+    }))
+  }, [])
+
+  const handleChangeFocusMinutes = useCallback((minutes: number) => {
+    setWidgets((current) => ({
+      ...current,
+      pomodoro: {
+        ...current.pomodoro,
+        focusMinutes: minutes,
+        breakMinutes: minutes >= 50 ? 10 : 5,
+      },
+    }))
+  }, [])
+
+  const handleCompleteFocusSession = useCallback(() => {
+    setWidgets((current) => ({
+      ...current,
+      pomodoro: {
+        ...current.pomodoro,
+        completedSessions: current.pomodoro.completedSessions + 1,
+      },
+    }))
+  }, [])
+
+  const handleTimerNotify = useCallback(
+    (message: string) => {
+      pushToast(message, 'info')
+    },
+    [pushToast],
+  )
+
   const handleExport = () => {
     try {
-      const filename = downloadBackup(favorites, categories, settings)
+      const filename = downloadBackup(favorites, categories, settings, widgets)
       pushToast(`${filename} 파일을 내보냈습니다.`)
     } catch {
       pushToast('백업 파일을 만들지 못했습니다. 다시 시도해 주세요.', 'error')
@@ -504,6 +623,7 @@ export default function App() {
     setCategories(nextCategories)
     setFavorites(nextFavorites)
     if (data.settings) setSettings(data.settings)
+    if (data.widgets) setWidgets(data.widgets)
     setFilter('')
     setActiveCategoryId(ALL_CATEGORY_ID)
     setArranging(false)
@@ -513,6 +633,7 @@ export default function App() {
     const parts = [`즐겨찾기 ${nextFavorites.length}개`]
     if (data.categories) parts.push(`카테고리 ${nextCategories.length}개`)
     if (data.settings) parts.push('설정')
+    if (data.widgets) parts.push('위젯')
     pushToast(`${parts.join(', ')} 데이터를 가져왔습니다.`)
   }
 
@@ -550,6 +671,7 @@ export default function App() {
     setFavorites(createStarterFavorites())
     setCategories(nextCategories)
     setSettings(createDefaultSettings())
+    setWidgets(createDefaultWidgetData())
     setActiveCategoryId(getDefaultCategoryId(nextCategories, ALL_CATEGORY_ID))
     setFilter('')
     setArranging(false)
@@ -581,49 +703,83 @@ export default function App() {
         onOpenSettings={() => openSettings('general')}
       />
 
-      <main id="main-content" className="home">
-        <section className="hero" aria-labelledby="home-title">
-          <h1 id="home-title" className="hero-title">
-            {settings.heroTitle}
-          </h1>
-          <p className="hero-subtitle">원하는 사이트를 빠르게 찾아보세요</p>
-          <SearchBar
-            engine={settings.searchEngine}
-            openInNewTab={settings.openInNewTab}
-            inputRef={searchInputRef}
-          />
-        </section>
+      <div
+        className={`home-layout ${settings.showSideWidgets ? 'has-side-widgets' : ''}`}
+      >
+        <main id="main-content" className="home">
+          <section className="hero" aria-labelledby="home-title">
+            <h1 id="home-title" className="hero-title">
+              {settings.heroTitle}
+            </h1>
+            <p className="hero-subtitle">원하는 사이트를 빠르게 찾아보세요</p>
+            <SearchBar
+              engine={settings.searchEngine}
+              openInNewTab={settings.openInNewTab}
+              inputRef={searchInputRef}
+            />
+          </section>
 
-        <FavoritesGrid
-          allFavorites={favorites}
-          visibleFavorites={categoryFavorites}
-          filteredFavorites={filteredFavorites}
-          categories={categories}
-          activeCategoryId={activeCategoryId}
-          filter={filter}
-          onFilterChange={setFilter}
-          onSelectCategory={setActiveCategoryId}
-          onManageCategories={() => setOverlay({ kind: 'categories' })}
-          onOpenAdd={openAdd}
-          onEditFavorite={(favorite) => setOverlay({ kind: 'editor', favorite })}
-          onDeleteFavorite={(favorite) => setOverlay({ kind: 'delete', favorite })}
-          onReorder={handleReorder}
-          onMoveFavorite={handleMoveFavorite}
-          onMoveToCategory={handleMoveToCategory}
-          onRestoreDefaults={handleRestoreDefaults}
-          arranging={arranging}
-          onExitArrange={() => setArranging(false)}
-          selecting={selecting}
-          selectedIds={selectedIds}
-          onToggleSelecting={handleToggleSelecting}
-          onExitSelecting={handleExitSelecting}
-          onToggleSelectFavorite={handleToggleSelectFavorite}
-          onToggleSelectAllVisible={handleToggleSelectAllVisible}
-          onClearSelection={handleClearSelection}
-          onBulkDelete={handleRequestBulkDelete}
-          onBulkMoveToCategory={handleBulkMoveToCategory}
-        />
-      </main>
+          <FavoritesGrid
+            allFavorites={favorites}
+            visibleFavorites={categoryFavorites}
+            filteredFavorites={filteredFavorites}
+            categories={categories}
+            activeCategoryId={activeCategoryId}
+            filter={filter}
+            onFilterChange={setFilter}
+            onSelectCategory={setActiveCategoryId}
+            onManageCategories={() => setOverlay({ kind: 'categories' })}
+            onOpenAdd={openAdd}
+            onEditFavorite={(favorite) => setOverlay({ kind: 'editor', favorite })}
+            onDeleteFavorite={(favorite) => setOverlay({ kind: 'delete', favorite })}
+            onReorder={handleReorder}
+            onMoveFavorite={handleMoveFavorite}
+            onMoveToCategory={handleMoveToCategory}
+            onRestoreDefaults={handleRestoreDefaults}
+            arranging={arranging}
+            onExitArrange={() => setArranging(false)}
+            selecting={selecting}
+            selectedIds={selectedIds}
+            onToggleSelecting={handleToggleSelecting}
+            onExitSelecting={handleExitSelecting}
+            onToggleSelectFavorite={handleToggleSelectFavorite}
+            onToggleSelectAllVisible={handleToggleSelectAllVisible}
+            onClearSelection={handleClearSelection}
+            onBulkDelete={handleRequestBulkDelete}
+            onBulkMoveToCategory={handleBulkMoveToCategory}
+          />
+        </main>
+
+        {settings.showSideWidgets && (
+          <>
+            <aside className="side-rail side-rail--left" aria-label="캘린더 및 D-Day 위젯">
+              <MiniCalendarWidget
+                notes={widgets.calendarNotes}
+                ddays={widgets.ddays}
+                onSaveNote={handleSaveCalendarNote}
+              />
+              <DdayWidget
+                ddays={widgets.ddays}
+                onAddDday={handleAddDday}
+                onDeleteDday={handleDeleteDday}
+              />
+            </aside>
+            <aside className="side-rail side-rail--right" aria-label="빠른 메모 및 포모도로 위젯">
+              <QuickMemoWidget
+                memo={widgets.memo}
+                onChangeMemo={handleChangeMemo}
+              />
+              <PomodoroWidget
+                settings={widgets.pomodoro}
+                onChangeFocusMinutes={handleChangeFocusMinutes}
+                onCompleteFocusSession={handleCompleteFocusSession}
+                onTimerTitleChange={setTimerTitlePrefix}
+                onNotify={handleTimerNotify}
+              />
+            </aside>
+          </>
+        )}
+      </div>
 
       <footer className="home-footer">
         <button type="button" className="footer-link" onClick={openAdd}>

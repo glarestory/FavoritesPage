@@ -47,6 +47,11 @@ Chrome의 새 탭 페이지에서 영감을 받은 개인용 즐겨찾기 대시
 - 설정 → `일반` → `페이지 문구`에서 상단 사이트 이름(기본 `My Start Page`, 브라우저 탭 제목에도 반영)과 메인 제목(기본 `My Homepage`)을 바꿀 수 있습니다.
 - 배경 밝기에 따라 텍스트와 헤더 색상을 자동으로 보정합니다.
 
+### 좌우 사이드 위젯
+- **왼쪽 (미니 캘린더 + D-Day)**: 월간 달력 탐색, 날짜별 한 줄 메모 저장, 중요한 일정의 D-Day 카운트다운 추가·정렬·삭제를 지원합니다.
+- **오른쪽 (빠른 메모 + 포모도로 타이머)**: 자동 저장되는 빠른 메모장(복사/비우기)과 집중·휴식 포모도로 타이머(15/25/50분 프리셋, 진행률 표시, 브라우저 탭 제목 연동, 완료 알림음·세션 카운트)를 제공합니다.
+- 설정 → `일반` → `좌우 사이드 위젯 표시` 스위치로 언제든 켜고 끌 수 있으며, 위젯 데이터는 `localStorage`와 JSON 백업에 함께 저장됩니다.
+
 ### 데이터 관리
 - 즐겨찾기, 카테고리와 설정을 `localStorage`에 자동 저장합니다.
 - JSON 파일로 내보내기/가져오기할 수 있습니다. 현재 백업 형식은 버전 2입니다.
@@ -127,7 +132,8 @@ npm run build
 | --- | --- |
 | `my-start-page.favorites.v1` | 즐겨찾기 배열 |
 | `my-start-page.categories.v1` | 카테고리 배열(배열 순서가 탭 표시 순서) |
-| `my-start-page.settings.v1` | 테마, 검색 엔진, 배경, 검색 결과 새 탭, 사이트 이름·메인 제목 |
+| `my-start-page.settings.v1` | 테마, 검색 엔진, 배경, 검색 결과 새 탭, 사이트 이름·메인 제목, 사이드 위젯 표시 |
+| `my-start-page.widgets.v1` | 캘린더 날짜 메모, D-Day 목록, 빠른 메모, 포모도로 타이머 설정·완료 횟수 |
 
 즐겨찾기 항목 형식:
 
@@ -215,6 +221,7 @@ src/
     BookmarkImportPanel.tsx  Chrome 북마크 HTML 미리보기·선택·중복 처리 UI
     Dialog.tsx               공통 모달 셸
     Toast.tsx                알림 스택
+    widgets/                 좌우 사이드 위젯(미니 캘린더, D-Day, 빠른 메모, 포모도로)
   hooks/
     useDialogFocus.ts        초기 포커스, Tab 트랩, 포커스 복원
     useCategoryDrop.ts       카드를 카테고리 탭에 드롭하는 핸들러
@@ -228,6 +235,7 @@ src/
     background-image.mjs     로컬 배경 이미지 검증·정규화·리사이즈 치수 계산
     favorite-icon.mjs        favicon 후보·회색 지구본 감지·모노그램·커스텀 아이콘 검증
     selection.mjs            다중 선택·일괄 삭제·카테고리 일괄 이동 로직
+    widgets.mjs              미니 캘린더·D-Day·메모·포모도로 순수 로직 및 검증
     local-image.ts           로컬 배경·아이콘 이미지 디코딩 및 Canvas 최적화
     backup.ts                JSON 백업 내보내기/검증(버전 2, 버전 1 호환)
     bookmarks.ts             Chrome 북마크 미리보기 타입과 병합 래퍼
@@ -241,6 +249,7 @@ tests/
   background-image.test.mjs  로컬 배경 이미지 검증·정규화·리사이즈 테스트
   favorite-icon.test.mjs     favicon 폴백·회색 지구본 감지·모노그램·아이콘 검증 테스트
   selection.test.mjs         다중 선택·일괄 삭제·일괄 이동 테스트
+  widgets.test.mjs           미니 캘린더·D-Day·타이머·위젯 데이터 정규화 테스트
   bookmarks.test.mjs         Chrome 북마크 파싱·중복·병합 테스트
   page-titles.test.mjs       페이지 문구 정규화 테스트
   category-drop.test.mjs     카테고리 드롭 판정 테스트
@@ -259,7 +268,7 @@ public/
 - 카테고리 관리와 카드의 카테고리 하위 메뉴는 키보드 포커스 이동과 `Esc` 닫기를 지원합니다.
 - `prefers-reduced-motion`을 존중합니다.
 - Lighthouse(데스크톱, 로컬 개발 서버 기준, 메인 화면 및 설정 → 데이터 탭): Accessibility 100, Best Practices 100, SEO 100
-- `npm test` 48개 테스트, `npm run typecheck`, `npm run build` 통과, 브라우저 콘솔 오류 없음
+- `npm test` 54개 테스트, `npm run typecheck`, `npm run build` 통과, 브라우저 콘솔 오류 없음
 - 검색, 카테고리 필터/추가·수정·삭제·순서 변경, 카테고리 이동, 즐겨찾기 추가/수정/삭제, 드래그 및 메뉴 이동, 필터, 테마/배경, 백업/복원, 초기화, 반응형 레이아웃을 직접 검증했습니다.
 - Chrome 북마크 HTML 미리보기, 폴더→카테고리 변환, 선택/전체 해제, 기존 URL 중복 유지, 잘못된 URL·빈 제목 처리, 기존 데이터 보존을 직접 검증했습니다.
 

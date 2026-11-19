@@ -41,6 +41,28 @@ export interface FavoriteInput {
   categoryId: string
 }
 
+export interface DdayItem {
+  id: string
+  title: string
+  targetDate: string
+  createdAt: number
+}
+
+export type CalendarNoteMap = Record<string, string>
+
+export interface PomodoroSettings {
+  focusMinutes: number
+  breakMinutes: number
+  completedSessions: number
+}
+
+export interface WidgetData {
+  ddays: DdayItem[]
+  calendarNotes: CalendarNoteMap
+  memo: string
+  pomodoro: PomodoroSettings
+}
+
 export interface Settings {
   theme: ThemeMode
   searchEngine: SearchEngineId
@@ -48,6 +70,7 @@ export interface Settings {
   openInNewTab: boolean
   siteTitle: string
   heroTitle: string
+  showSideWidgets: boolean
 }
 
 export interface BackupFile {
@@ -57,6 +80,7 @@ export interface BackupFile {
   favorites: Favorite[]
   categories: Category[]
   settings: Settings
+  widgets?: WidgetData
 }
 
 export type SettingsTab = 'general' | 'background' | 'data'

@@ -285,3 +285,92 @@ export function SmileIcon(props: IconProps) {
     </Icon>
   )
 }
+
+export function CalendarIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="4.5" width="18" height="16.5" rx="3" />
+      <path d="M8 2.5v4M16 2.5v4M3 9.5h18" />
+    </Icon>
+  )
+}
+
+export function FlagIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 21V4" />
+      <path d="M5 5h12l-2.5 4.5L17 14H5" />
+    </Icon>
+  )
+}
+
+export function FileTextIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8Z" />
+      <path d="M14 3v5h5M9 13h6M9 17h4" />
+    </Icon>
+  )
+}
+
+export function TimerIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M10 2h4M12 14l3-3" />
+      <circle cx="12" cy="14" r="8" />
+    </Icon>
+  )
+}
+
+export function PlayIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 5.5v13l11-6.5Z" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+export function PauseIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="6.5" y="5" width="3.8" height="14" rx="1" fill="currentColor" stroke="none" />
+      <rect x="13.7" y="5" width="3.8" height="14" rx="1" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}
+
+export function SkipForwardIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M5 5.5v13l9-6.5Z" />
+      <path d="M18 5.5v13" />
+    </Icon>
+  )
+}
+
+export function CopyIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+    </Icon>
+  )
+}
+
+export function Volume2Icon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M11 5 6 9H3v6h3l5 4Z" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" />
+    </Icon>
+  )
+}
+
+export function VolumeXIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M11 5 6 9H3v6h3l5 4Z" />
+      <path d="m21 9-6 6M15 9l6 6" />
+    </Icon>
+  )
+}

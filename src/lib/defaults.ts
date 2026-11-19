@@ -5,6 +5,7 @@ export const STORAGE_KEYS = {
   favorites: 'my-start-page.favorites.v1',
   categories: 'my-start-page.categories.v1',
   settings: 'my-start-page.settings.v1',
+  widgets: 'my-start-page.widgets.v1',
 } as const
 
 const STARTER_FAVORITES: ReadonlyArray<Omit<Favorite, 'id' | 'createdAt'>> = [
@@ -31,6 +32,7 @@ export const DEFAULT_SETTINGS: Settings = {
   openInNewTab: false,
   siteTitle: 'My Start Page',
   heroTitle: 'My Homepage',
+  showSideWidgets: true,
 }
 
 export function createStarterFavorites(): Favorite[] {

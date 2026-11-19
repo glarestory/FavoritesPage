@@ -1,4 +1,11 @@
-import type { BackupFile, BackgroundSettings, Category, Favorite, Settings } from '../types'
+import type {
+  BackupFile,
+  BackgroundSettings,
+  Category,
+  Favorite,
+  Settings,
+  WidgetData,
+} from '../types'
 import { GRADIENT_PRESETS } from './background'
 import {
   normalizeBackgroundFileName,
@@ -8,6 +15,7 @@ import {
   normalizeIconEmoji,
   validateLocalIconDataUrl,
 } from './favorite-icon.mjs'
+import { sanitizeWidgetData } from './widgets.mjs'
 import {
   ALL_CATEGORY_ID,
   ALL_CATEGORY_LABEL,
@@ -33,6 +41,7 @@ export interface ImportedData {
   favorites: Favorite[]
   categories?: Category[]
   settings?: Settings
+  widgets?: WidgetData
 }
 
 export type ImportResult =
@@ -318,6 +327,10 @@ function parseImportedSettings(raw: unknown): Settings | { error: string } | und
     return { error: '메인 제목은 문자열이어야 합니다.' }
   }
 
+  if (raw.showSideWidgets !== undefined && typeof raw.showSideWidgets !== 'boolean') {
+    return { error: '좌우 위젯 표시 설정은 true 또는 false여야 합니다.' }
+  }
+
   const background = parseImportedBackground(raw.background)
   if ('error' in background) return background
 
@@ -329,6 +342,10 @@ function parseImportedSettings(raw: unknown): Settings | { error: string } | und
       typeof raw.openInNewTab === 'boolean' ? raw.openInNewTab : defaults.openInNewTab,
     siteTitle: normalizePageTitle(raw.siteTitle, defaults.siteTitle),
     heroTitle: normalizePageTitle(raw.heroTitle, defaults.heroTitle),
+    showSideWidgets:
+      typeof raw.showSideWidgets === 'boolean'
+        ? raw.showSideWidgets
+        : defaults.showSideWidgets,
   }
 }
 
@@ -389,12 +406,21 @@ export function parseBackup(text: string): ImportResult {
     return { ok: false, error: settingsResult.error }
   }
 
+  let widgets: WidgetData | undefined
+  if (parsed.widgets !== undefined) {
+    if (!isRecord(parsed.widgets)) {
+      return { ok: false, error: '위젯 데이터(widgets)가 객체 형식이 아닙니다.' }
+    }
+    widgets = sanitizeWidgetData(parsed.widgets)
+  }
+
   return {
     ok: true,
     value: {
       favorites: favoritesResult.favorites,
       ...(categories ? { categories } : {}),
       ...(settingsResult ? { settings: settingsResult } : {}),
+      ...(widgets ? { widgets } : {}),
     },
   }
 }
@@ -403,6 +429,7 @@ export function serializeBackup(
   favorites: Favorite[],
   categories: Category[],
   settings: Settings,
+  widgets?: WidgetData,
 ): string {
   const backup: BackupFile = {
     app: APP_ID,
@@ -411,6 +438,7 @@ export function serializeBackup(
     favorites,
     categories,
     settings,
+    ...(widgets ? { widgets } : {}),
   }
   return JSON.stringify(backup, null, 2)
 }
@@ -419,6 +447,7 @@ export function downloadBackup(
   favorites: Favorite[],
   categories: Category[],
   settings: Settings,
+  widgets?: WidgetData,
 ): string {
   const date = new Date()
   const datePart = [
@@ -427,7 +456,7 @@ export function downloadBackup(
     String(date.getDate()).padStart(2, '0'),
   ].join('-')
   const filename = `my-start-page-backup-${datePart}.json`
-  const blob = new Blob([serializeBackup(favorites, categories, settings)], {
+  const blob = new Blob([serializeBackup(favorites, categories, settings, widgets)], {
     type: 'application/json',
   })
   const url = URL.createObjectURL(blob)
