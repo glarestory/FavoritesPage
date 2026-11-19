@@ -1,6 +1,10 @@
 import type { BackupFile, BackgroundSettings, Category, Favorite, Settings } from '../types'
 import { GRADIENT_PRESETS } from './background'
 import {
+  normalizeBackgroundFileName,
+  validateLocalImageDataUrl,
+} from './background-image.mjs'
+import {
   ALL_CATEGORY_ID,
   ALL_CATEGORY_LABEL,
   createDefaultCategories,
@@ -221,15 +225,36 @@ function parseImportedBackground(raw: unknown): BackgroundSettings | { error: st
 
   if (raw.type === 'image') {
     if (typeof raw.url !== 'string') {
-      return { error: '배경 이미지 URL이 없습니다.' }
+      return { error: '배경 이미지 주소 또는 데이터가 없습니다.' }
     }
-    const validated = validateWebUrl(raw.url, '배경 이미지 URL')
-    if (!validated.ok) return { error: validated.error }
+    if (raw.source !== undefined && raw.source !== 'url' && raw.source !== 'local') {
+      return { error: '배경 이미지 출처 설정이 올바르지 않습니다.' }
+    }
+    if (raw.fileName !== undefined && typeof raw.fileName !== 'string') {
+      return { error: '배경 이미지 파일 이름은 문자열이어야 합니다.' }
+    }
+
     const overlay =
       typeof raw.overlay === 'number' && Number.isFinite(raw.overlay)
         ? Math.min(0.85, Math.max(0, raw.overlay))
         : 0.45
-    return { type: 'image', url: validated.value, overlay }
+
+    if (raw.url.trim().startsWith('data:')) {
+      const validatedLocal = validateLocalImageDataUrl(raw.url)
+      if (!validatedLocal.ok) return { error: validatedLocal.error }
+      const fileName = normalizeBackgroundFileName(raw.fileName)
+      return {
+        type: 'image',
+        url: validatedLocal.value,
+        overlay,
+        source: 'local',
+        ...(fileName ? { fileName } : {}),
+      }
+    }
+
+    const validated = validateWebUrl(raw.url, '배경 이미지 URL')
+    if (!validated.ok) return { error: validated.error }
+    return { type: 'image', url: validated.value, overlay, source: 'url' }
   }
 
   return { error: '알 수 없는 배경 유형입니다.' }

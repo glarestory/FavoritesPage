@@ -163,6 +163,7 @@ input:focus-visible {
   margin: -1px !important;
   overflow: hidden !important;
   clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(50%) !important;
   white-space: nowrap !important;
   border: 0 !important;
   opacity: 0 !important;
@@ -1654,6 +1655,14 @@ input:focus-visible {
   line-height: 1.55;
 }
 
+.field-status {
+  margin: 7px 0 0;
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.55;
+}
+
 /* --------------------------------------------------------------------------
    Category manager
    -------------------------------------------------------------------------- */
@@ -2715,6 +2724,111 @@ kbd {
   color: var(--accent);
 }
 
+.image-source-fieldset {
+  margin: 0 0 14px;
+  padding: 0;
+  border: 0;
+}
+
+.image-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.image-source-option {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.image-source-option:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.image-source-option:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.image-source-option.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.image-local-panel {
+  margin-bottom: 4px;
+}
+
+.image-dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 14px;
+  border: 1.5px dashed var(--border-strong);
+  border-radius: 13px;
+  background: var(--surface-muted);
+  text-align: center;
+  transition:
+    border-color 0.16s ease,
+    background-color 0.16s ease,
+    opacity 0.16s ease;
+}
+
+.image-dropzone.is-dragging {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.image-dropzone.is-busy {
+  opacity: 0.72;
+}
+
+.image-dropzone-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--accent);
+}
+
+.image-dropzone-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.image-dropzone-hint {
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .image-form {
   margin-bottom: 4px;
 }
@@ -2755,6 +2869,18 @@ kbd {
   color: var(--text);
   font-size: 12px;
   font-weight: 650;
+}
+
+.applied-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .applied-dot {

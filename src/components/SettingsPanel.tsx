@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import type {
+  DragEvent as ReactDragEvent,
   FormEvent,
   KeyboardEvent as ReactKeyboardEvent,
   ReactNode,
 } from 'react'
 import type {
+  BackgroundImageSource,
   BackgroundSettings,
   Category,
   Favorite,
@@ -22,6 +24,12 @@ import {
   GRADIENT_PRESETS,
   resolveBackground,
 } from '../lib/background'
+import {
+  getBackgroundImageSource,
+  LOCAL_IMAGE_ACCEPT,
+  MAX_LOCAL_IMAGE_FILE_BYTES,
+} from '../lib/background-image.mjs'
+import { prepareLocalBackgroundImage } from '../lib/local-image'
 import { SEARCH_ENGINES } from '../lib/search'
 import { validateWebUrl } from '../lib/url'
 import { Dialog } from './Dialog'
@@ -33,6 +41,7 @@ import {
   DatabaseIcon,
   DownloadIcon,
   ImageIcon,
+  LinkIcon,
   MoonIcon,
   PaletteIcon,
   RotateCcwIcon,
@@ -54,7 +63,18 @@ interface SettingsPanelProps {
   onClose: () => void
 }
 
-type ImageState = 'idle' | 'checking'
+type ImageState = 'idle' | 'checking' | 'processing'
+
+const MAX_LOCAL_IMAGE_MB = Math.round(MAX_LOCAL_IMAGE_FILE_BYTES / (1024 * 1024))
+
+const IMAGE_SOURCE_OPTIONS: Array<{
+  id: BackgroundImageSource
+  label: string
+  icon: ReactNode
+}> = [
+  { id: 'local', label: '내 기기에서 선택', icon: <UploadIcon size={15} /> },
+  { id: 'url', label: '이미지 URL', icon: <LinkIcon size={15} /> },
+]
 
 type ImportState =
   | { status: 'idle' }
@@ -97,29 +117,59 @@ export function SettingsPanel({
   onReset,
   onClose,
 }: SettingsPanelProps) {
+  const initialImageSource: BackgroundImageSource =
+    settings.background.type === 'image'
+      ? getBackgroundImageSource(settings.background)
+      : 'local'
+
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab)
   const [selectedType, setSelectedType] = useState<BackgroundSettings['type']>(
     settings.background.type,
   )
+  const [imageSource, setImageSource] = useState<BackgroundImageSource>(initialImageSource)
   const [imageUrl, setImageUrl] = useState(
-    settings.background.type === 'image' ? settings.background.url : '',
+    settings.background.type === 'image' && initialImageSource === 'url'
+      ? settings.background.url
+      : '',
   )
   const [imageError, setImageError] = useState('')
+  const [imageStatus, setImageStatus] = useState('')
   const [imageState, setImageState] = useState<ImageState>('idle')
+  const [isDraggingImage, setIsDraggingImage] = useState(false)
   const [importState, setImportState] = useState<ImportState>({ status: 'idle' })
   const [resetConfirm, setResetConfirm] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const localImageInputRef = useRef<HTMLInputElement>(null)
   const resetTriggerRef = useRef<HTMLButtonElement>(null)
+  const imageRequestIdRef = useRef(0)
 
   useEffect(() => {
     setSelectedType(settings.background.type)
-    if (settings.background.type === 'image') setImageUrl(settings.background.url)
+    if (settings.background.type === 'image') {
+      const source = getBackgroundImageSource(settings.background)
+      setImageSource(source)
+      if (source === 'url') setImageUrl(settings.background.url)
+    }
   }, [settings.background])
+
+  useEffect(() => {
+    return () => {
+      imageRequestIdRef.current += 1
+    }
+  }, [])
 
   const backgroundPreview = resolveBackground(settings.background, settings.theme)
   const colorValue =
     settings.background.type === 'color' ? settings.background.color : '#eef3fb'
   const overlay = settings.background.type === 'image' ? settings.background.overlay : 0.45
+  const appliedImageSource: BackgroundImageSource | null =
+    settings.background.type === 'image'
+      ? getBackgroundImageSource(settings.background)
+      : null
+  const appliedFileName =
+    settings.background.type === 'image'
+      ? settings.background.fileName ?? '로컬 이미지'
+      : ''
 
   const selectTab = (tab: SettingsTab) => setActiveTab(tab)
 
@@ -143,8 +193,12 @@ export function SettingsPanel({
   }
 
   const selectBackgroundType = (type: BackgroundSettings['type']) => {
+    imageRequestIdRef.current += 1
     setSelectedType(type)
     setImageError('')
+    setImageStatus('')
+    setImageState('idle')
+    setIsDraggingImage(false)
     if (type === 'default') {
       onPatchSettings({ background: { type: 'default' } })
     } else if (type === 'color') {
@@ -165,15 +219,92 @@ export function SettingsPanel({
     }
   }
 
+  const selectImageSource = (source: BackgroundImageSource) => {
+    setImageSource(source)
+    setImageError('')
+    setImageStatus('')
+    setIsDraggingImage(false)
+  }
+
+  const handleLocalImageFile = async (file: File | undefined) => {
+    if (!file) return
+
+    const requestId = imageRequestIdRef.current + 1
+    imageRequestIdRef.current = requestId
+
+    setImageError('')
+    setImageStatus('')
+    setImageState('processing')
+
+    try {
+      const result = await prepareLocalBackgroundImage(file)
+      if (imageRequestIdRef.current !== requestId) return
+
+      setImageState('idle')
+      if (!result.ok) {
+        setImageError(result.error)
+        return
+      }
+
+      onPatchSettings({
+        background: {
+          type: 'image',
+          url: result.dataUrl,
+          overlay: settings.background.type === 'image' ? settings.background.overlay : 0.45,
+          source: 'local',
+          fileName: result.fileName,
+        },
+      })
+      setImageStatus(
+        result.optimized
+          ? `${result.fileName} 이미지를 최적화해 배경으로 적용했습니다.`
+          : `${result.fileName} 이미지를 배경으로 적용했습니다.`,
+      )
+    } finally {
+      if (localImageInputRef.current) localImageInputRef.current.value = ''
+    }
+  }
+
+  const handleLocalImageDragEnter = (event: ReactDragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (imageState === 'processing') return
+    setIsDraggingImage(true)
+  }
+
+  const handleLocalImageDragOver = (event: ReactDragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    if (imageState === 'processing') return
+    event.dataTransfer.dropEffect = 'copy'
+    if (!isDraggingImage) setIsDraggingImage(true)
+  }
+
+  const handleLocalImageDragLeave = (event: ReactDragEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return
+    setIsDraggingImage(false)
+  }
+
+  const handleLocalImageDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    setIsDraggingImage(false)
+    if (imageState === 'processing') return
+    const droppedFile = event.dataTransfer.files?.[0]
+    if (droppedFile) void handleLocalImageFile(droppedFile)
+  }
+
   const applyImage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const validated = validateWebUrl(imageUrl, '배경 이미지 URL')
     if (!validated.ok) {
       setImageError(validated.error)
+      setImageStatus('')
       return
     }
 
+    const requestId = imageRequestIdRef.current + 1
+    imageRequestIdRef.current = requestId
+
     setImageError('')
+    setImageStatus('')
     setImageState('checking')
 
     const loaded = await new Promise<boolean>((resolve) => {
@@ -200,6 +331,8 @@ export function SettingsPanel({
       image.src = validated.value
     })
 
+    if (imageRequestIdRef.current !== requestId) return
+
     setImageState('idle')
     if (!loaded) {
       setImageError('이미지를 불러올 수 없습니다. 접근 가능한 이미지 주소인지 확인해 주세요.')
@@ -211,8 +344,10 @@ export function SettingsPanel({
         type: 'image',
         url: validated.value,
         overlay: settings.background.type === 'image' ? settings.background.overlay : 0.45,
+        source: 'url',
       },
     })
+    setImageStatus('이미지 URL을 배경으로 적용했습니다.')
   }
 
   const handleImportFile = async (file: File | undefined) => {
@@ -511,51 +646,158 @@ export function SettingsPanel({
 
           {selectedType === 'image' && (
             <div className="settings-section">
-              <form className="image-form" onSubmit={applyImage} noValidate>
-                <label htmlFor="background-image-url">이미지 URL</label>
-                <div className="image-url-row">
-                  <input
-                    id="background-image-url"
-                    type="text"
-                    value={imageUrl}
-                    placeholder="https://example.com/background.jpg"
-                    inputMode="url"
-                    spellCheck={false}
-                    aria-invalid={Boolean(imageError)}
-                    aria-describedby={imageError ? 'background-image-error' : 'background-image-help'}
-                    onChange={(event) => {
-                      setImageUrl(event.target.value)
-                      if (imageError) setImageError('')
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    className="button button--primary button--compact"
-                    disabled={imageState === 'checking'}
-                  >
-                    {imageState === 'checking' ? '확인 중...' : '적용'}
-                  </button>
+              <fieldset className="image-source-fieldset">
+                <legend className="field-label">이미지 추가 방식</legend>
+                <div className="image-source-grid">
+                  {IMAGE_SOURCE_OPTIONS.map((option) => (
+                    <label
+                      key={option.id}
+                      className={`image-source-option ${
+                        imageSource === option.id ? 'is-selected' : ''
+                      }`}
+                    >
+                      <input
+                        className="choice-input"
+                        type="radio"
+                        name="background-image-source"
+                        value={option.id}
+                        checked={imageSource === option.id}
+                        onChange={() => selectImageSource(option.id)}
+                      />
+                      {option.icon}
+                      <span>{option.label}</span>
+                    </label>
+                  ))}
                 </div>
-                {imageError ? (
-                  <p id="background-image-error" className="field-error" role="alert">
-                    {imageError}
-                  </p>
-                ) : (
-                  <p id="background-image-help" className="field-help">
-                    접근 가능한 이미지 주소를 입력하면 배경으로 적용됩니다. 가로형 이미지를
-                    권장합니다.
-                  </p>
-                )}
-              </form>
+              </fieldset>
+
+              {imageSource === 'local' ? (
+                <div className="image-local-panel">
+                  <input
+                    ref={localImageInputRef}
+                    id="background-image-file"
+                    type="file"
+                    accept={LOCAL_IMAGE_ACCEPT}
+                    aria-label="로컬 배경 이미지 선택"
+                    className="visually-hidden-input"
+                    onChange={(event) => void handleLocalImageFile(event.target.files?.[0])}
+                  />
+                  <div
+                    className={`image-dropzone ${isDraggingImage ? 'is-dragging' : ''} ${
+                      imageState === 'processing' ? 'is-busy' : ''
+                    }`}
+                    onDragEnter={handleLocalImageDragEnter}
+                    onDragOver={handleLocalImageDragOver}
+                    onDragLeave={handleLocalImageDragLeave}
+                    onDrop={handleLocalImageDrop}
+                  >
+                    <span className="image-dropzone-icon" aria-hidden="true">
+                      <UploadIcon size={20} />
+                    </span>
+                    <p className="image-dropzone-title">
+                      {isDraggingImage
+                        ? '여기에 이미지를 놓으면 배경으로 적용됩니다'
+                        : '이미지 파일을 끌어다 놓거나 직접 선택하세요'}
+                    </p>
+                    <p id="background-local-help" className="image-dropzone-hint">
+                      JPG, PNG, WebP, GIF, AVIF · 최대 {MAX_LOCAL_IMAGE_MB}MB (자동 최적화)
+                    </p>
+                    <button
+                      type="button"
+                      className="button button--secondary button--compact"
+                      onClick={() => localImageInputRef.current?.click()}
+                      disabled={imageState === 'processing'}
+                      aria-describedby={
+                        imageError ? 'background-image-error' : 'background-local-help'
+                      }
+                    >
+                      {imageState === 'processing' ? '이미지 처리 중...' : '이미지 파일 선택'}
+                    </button>
+                  </div>
+                  {imageError && (
+                    <p id="background-image-error" className="field-error" role="alert">
+                      {imageError}
+                    </p>
+                  )}
+                  {!imageError && imageStatus && (
+                    <p className="field-status" role="status">
+                      {imageStatus}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <form className="image-form" onSubmit={applyImage} noValidate>
+                  <label htmlFor="background-image-url">이미지 URL</label>
+                  <div className="image-url-row">
+                    <input
+                      id="background-image-url"
+                      name="background-image-url"
+                      type="text"
+                      value={imageUrl}
+                      placeholder="https://example.com/background.jpg"
+                      inputMode="url"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      spellCheck={false}
+                      aria-invalid={Boolean(imageError)}
+                      aria-describedby={
+                        imageError ? 'background-image-error' : 'background-image-help'
+                      }
+                      onChange={(event) => {
+                        setImageUrl(event.target.value)
+                        if (imageError) setImageError('')
+                        if (imageStatus) setImageStatus('')
+                      }}
+                    />
+                    <button
+                      type="submit"
+                      className="button button--primary button--compact"
+                      disabled={imageState === 'checking'}
+                    >
+                      {imageState === 'checking' ? '확인 중...' : '적용'}
+                    </button>
+                  </div>
+                  {imageError ? (
+                    <p id="background-image-error" className="field-error" role="alert">
+                      {imageError}
+                    </p>
+                  ) : imageStatus ? (
+                    <p className="field-status" role="status">
+                      {imageStatus}
+                    </p>
+                  ) : (
+                    <p id="background-image-help" className="field-help">
+                      접근 가능한 이미지 주소를 입력하면 배경으로 적용됩니다. 가로형 이미지를
+                      권장합니다.
+                    </p>
+                  )}
+                </form>
+              )}
 
               {settings.background.type === 'image' ? (
                 <div className="applied-background">
                   <div className="applied-background-head">
                     <span className="applied-dot" aria-hidden="true" />
-                    <p>이미지 배경이 적용되어 있습니다.</p>
+                    <p>
+                      {appliedImageSource === 'local'
+                        ? '로컬 이미지 배경이 적용되어 있습니다.'
+                        : '이미지 배경이 적용되어 있습니다.'}
+                    </p>
+                    <span className="applied-badge">
+                      {appliedImageSource === 'local' ? '내 기기' : 'URL'}
+                    </span>
                   </div>
-                  <p className="applied-url" title={settings.background.url}>
-                    {settings.background.url}
+                  <p
+                    className="applied-url"
+                    title={
+                      appliedImageSource === 'local'
+                        ? appliedFileName
+                        : settings.background.url
+                    }
+                  >
+                    {appliedImageSource === 'local'
+                      ? appliedFileName
+                      : settings.background.url}
                   </p>
                   <label className="range-field" htmlFor="background-overlay">
                     <span>
@@ -569,28 +811,34 @@ export function SettingsPanel({
                       max="0.85"
                       step="0.05"
                       value={overlay}
-                      onChange={(event) =>
+                      onChange={(event) => {
+                        if (settings.background.type !== 'image') return
                         onPatchSettings({
                           background: {
-                            type: 'image',
-                            url: settings.background.type === 'image' ? settings.background.url : '',
+                            ...settings.background,
                             overlay: Number(event.target.value),
                           },
                         })
-                      }
+                      }}
                     />
                   </label>
                   <button
                     type="button"
                     className="text-button"
-                    onClick={() => onPatchSettings({ background: { type: 'default' } })}
+                    onClick={() => {
+                      setImageError('')
+                      setImageStatus('')
+                      onPatchSettings({ background: { type: 'default' } })
+                    }}
                   >
                     이미지 배경 제거
                   </button>
                 </div>
               ) : (
                 <p className="section-note">
-                  이미지 주소를 적용하면 배경이 변경됩니다. 적용 전에는 이전 배경이 유지됩니다.
+                  {imageSource === 'local'
+                    ? '이미지를 선택하면 바로 배경에 적용됩니다. 로컬 이미지는 브라우저 저장소와 JSON 백업에 함께 보관됩니다.'
+                    : '이미지 주소를 적용하면 배경이 변경됩니다. 적용 전에는 이전 배경이 유지됩니다.'}
                 </p>
               )}
             </div>

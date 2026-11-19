@@ -1,6 +1,10 @@
 import type { BackgroundSettings, Category, Favorite, Settings } from '../types'
 import { GRADIENT_PRESETS } from './background'
 import {
+  normalizeBackgroundFileName,
+  validateLocalImageDataUrl,
+} from './background-image.mjs'
+import {
   ALL_CATEGORY_ID,
   ALL_CATEGORY_LABEL,
   createDefaultCategories,
@@ -179,13 +183,34 @@ function sanitizeBackground(value: unknown): BackgroundSettings {
   }
 
   if (value.type === 'image' && typeof value.url === 'string') {
+    const overlay =
+      typeof value.overlay === 'number' && Number.isFinite(value.overlay)
+        ? Math.min(0.85, Math.max(0, value.overlay))
+        : 0.45
+
+    if (value.url.trim().startsWith('data:')) {
+      const validatedLocal = validateLocalImageDataUrl(value.url)
+      if (validatedLocal.ok) {
+        const fileName = normalizeBackgroundFileName(value.fileName)
+        return {
+          type: 'image',
+          url: validatedLocal.value,
+          overlay,
+          source: 'local',
+          ...(fileName ? { fileName } : {}),
+        }
+      }
+      return { type: 'default' }
+    }
+
     const validated = validateWebUrl(value.url, '배경 이미지 URL')
     if (validated.ok) {
-      const overlay =
-        typeof value.overlay === 'number' && Number.isFinite(value.overlay)
-          ? Math.min(0.85, Math.max(0, value.overlay))
-          : 0.45
-      return { type: 'image', url: validated.value, overlay }
+      return {
+        type: 'image',
+        url: validated.value,
+        overlay,
+        source: 'url',
+      }
     }
   }
 
@@ -378,7 +403,13 @@ export function saveSettings(settings: Settings): string | null {
   try {
     storage.setItem(STORAGE_KEYS.settings, JSON.stringify(settings))
     return null
-  } catch {
+  } catch (error) {
+    const isQuotaError =
+      error instanceof DOMException &&
+      (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+    if (isQuotaError) {
+      return '브라우저 저장 공간이 부족해 설정을 저장하지 못했습니다. 더 작은 배경 이미지를 선택해 주세요.'
+    }
     return '설정을 저장하지 못했습니다. 브라우저 저장 공간을 확인해 주세요.'
   }
 }

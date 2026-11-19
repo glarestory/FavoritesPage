@@ -4,11 +4,19 @@ export type ThemeMode = 'light' | 'dark'
 
 export type GradientId = 'daylight' | 'mist' | 'mint' | 'lavender' | 'midnight' | 'graphite'
 
+export type BackgroundImageSource = 'url' | 'local'
+
 export type BackgroundSettings =
   | { type: 'default' }
   | { type: 'color'; color: string }
   | { type: 'gradient'; gradient: GradientId }
-  | { type: 'image'; url: string; overlay: number }
+  | {
+      type: 'image'
+      url: string
+      overlay: number
+      source?: BackgroundImageSource
+      fileName?: string
+    }
 
 export interface Category {
   id: string
