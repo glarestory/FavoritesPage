@@ -5,6 +5,10 @@ import {
   validateLocalImageDataUrl,
 } from './background-image.mjs'
 import {
+  normalizeIconEmoji,
+  validateLocalIconDataUrl,
+} from './favorite-icon.mjs'
+import {
   ALL_CATEGORY_ID,
   ALL_CATEGORY_LABEL,
   createDefaultCategories,
@@ -155,11 +159,28 @@ function parseImportedFavorites(
       if (typeof entry.iconUrl !== 'string') {
         return { error: `${position}번째 즐겨찾기(${name})의 아이콘 URL이 문자열이 아닙니다.` }
       }
-      const validatedIcon = validateWebUrl(entry.iconUrl, '아이콘 URL')
-      if (!validatedIcon.ok) {
-        return { error: `${position}번째 즐겨찾기(${name}): ${validatedIcon.error}` }
+      const trimmedIcon = entry.iconUrl.trim()
+      if (trimmedIcon.startsWith('data:')) {
+        const validatedLocalIcon = validateLocalIconDataUrl(trimmedIcon)
+        if (!validatedLocalIcon.ok) {
+          return { error: `${position}번째 즐겨찾기(${name}): ${validatedLocalIcon.error}` }
+        }
+        iconUrl = validatedLocalIcon.value
+      } else {
+        const validatedIcon = validateWebUrl(trimmedIcon, '아이콘 URL')
+        if (!validatedIcon.ok) {
+          return { error: `${position}번째 즐겨찾기(${name}): ${validatedIcon.error}` }
+        }
+        iconUrl = validatedIcon.value
       }
-      iconUrl = validatedIcon.value
+    }
+
+    let iconEmoji: string | undefined
+    if (entry.iconEmoji !== undefined && entry.iconEmoji !== null && entry.iconEmoji !== '') {
+      if (typeof entry.iconEmoji !== 'string') {
+        return { error: `${position}번째 즐겨찾기(${name})의 아이콘 이모지가 문자열이 아닙니다.` }
+      }
+      iconEmoji = normalizeIconEmoji(entry.iconEmoji)
     }
 
     let id =
@@ -194,7 +215,8 @@ function parseImportedFavorites(
       id,
       name,
       url: validatedUrl.value,
-      iconUrl,
+      ...(iconUrl ? { iconUrl } : {}),
+      ...(iconEmoji ? { iconEmoji } : {}),
       categoryId,
       createdAt,
     })

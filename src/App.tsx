@@ -34,6 +34,13 @@ import {
   saveSettings,
 } from './lib/storage'
 import { moveItemToTarget } from './lib/reorder.mjs'
+import {
+  moveFavoritesToCategory,
+  pruneSelectionIds,
+  removeFavoritesByIds,
+  toggleSelectAllVisible,
+  toggleSelectionId,
+} from './lib/selection.mjs'
 import { isDuplicateUrl, validateWebUrl } from './lib/url'
 import { Header } from './components/Header'
 import { SearchBar } from './components/SearchBar'
@@ -54,6 +61,7 @@ interface InitialState {
 type OverlayState =
   | { kind: 'editor'; favorite: Favorite | null }
   | { kind: 'delete'; favorite: Favorite }
+  | { kind: 'bulk-delete'; favorites: Favorite[] }
   | { kind: 'categories' }
   | { kind: 'settings'; tab: SettingsTab }
   | null
@@ -84,6 +92,8 @@ export default function App() {
   )
   const [filter, setFilter] = useState('')
   const [arranging, setArranging] = useState(false)
+  const [selecting, setSelecting] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [overlay, setOverlay] = useState<OverlayState>(null)
   const [toasts, setToasts] = useState<ToastMessage[]>([])
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -166,17 +176,38 @@ export default function App() {
   }, [categories, activeCategoryId])
 
   useEffect(() => {
+    setSelectedIds((current) => {
+      if (current.length === 0) return current
+      const next = pruneSelectionIds(current, favorites)
+      return next.length === current.length ? current : next
+    })
+    if (favorites.length === 0 && selecting) {
+      setSelecting(false)
+    }
+  }, [favorites, selecting])
+
+  useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k') {
         if (overlay) return
         event.preventDefault()
         searchInputRef.current?.focus()
         searchInputRef.current?.select()
+        return
+      }
+      if (event.key === 'Escape' && !overlay && selecting) {
+        const target = event.target
+        if (target instanceof HTMLInputElement && target.id === 'favorite-filter' && filter) {
+          return
+        }
+        event.preventDefault()
+        setSelecting(false)
+        setSelectedIds([])
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [overlay])
+  }, [overlay, selecting, filter])
 
   const categoryFavorites = useMemo(
     () =>
@@ -235,6 +266,7 @@ export default function App() {
       name: input.name.trim(),
       url: validated.value,
       iconUrl: input.iconUrl,
+      iconEmoji: input.iconEmoji,
       categoryId,
     }
 
@@ -242,7 +274,12 @@ export default function App() {
       setFavorites((current) =>
         current.map((favorite) =>
           favorite.id === editingFavorite.id
-            ? { ...favorite, ...normalizedInput, iconUrl: normalizedInput.iconUrl }
+            ? {
+                ...favorite,
+                ...normalizedInput,
+                iconUrl: normalizedInput.iconUrl,
+                iconEmoji: normalizedInput.iconEmoji,
+              }
             : favorite,
         ),
       )
@@ -363,11 +400,85 @@ export default function App() {
     })
   }
 
+  const handleToggleSelecting = () => {
+    setSelecting((current) => {
+      const next = !current
+      if (next) {
+        setArranging(false)
+      } else {
+        setSelectedIds([])
+      }
+      return next
+    })
+  }
+
+  const handleExitSelecting = () => {
+    setSelecting(false)
+    setSelectedIds([])
+  }
+
+  const handleToggleSelectFavorite = (favoriteId: string) => {
+    setSelectedIds((current) => toggleSelectionId(current, favoriteId))
+  }
+
+  const handleToggleSelectAllVisible = (visibleIds: string[]) => {
+    setSelectedIds((current) => toggleSelectAllVisible(current, visibleIds))
+  }
+
+  const handleClearSelection = () => {
+    setSelectedIds([])
+  }
+
+  const handleRequestBulkDelete = () => {
+    const selectedSet = new Set(selectedIds)
+    const targets = favorites.filter((favorite) => selectedSet.has(favorite.id))
+    if (targets.length === 0) return
+    setOverlay({ kind: 'bulk-delete', favorites: targets })
+  }
+
+  const confirmBulkDelete = () => {
+    if (overlay?.kind !== 'bulk-delete') return
+    const idsToRemove = overlay.favorites.map((favorite) => favorite.id)
+    const { favorites: nextFavorites, removedCount } = removeFavoritesByIds(
+      favorites,
+      idsToRemove,
+    )
+    setFavorites(nextFavorites)
+    setSelectedIds([])
+    setSelecting(false)
+    setOverlay(null)
+    if (removedCount > 0) {
+      pushToast(`즐겨찾기 ${removedCount}개를 삭제했습니다.`)
+    }
+    window.requestAnimationFrame(() => {
+      document.getElementById('favorite-filter')?.focus()
+    })
+  }
+
+  const handleBulkMoveToCategory = (categoryId: string) => {
+    const category = categories.find((item) => item.id === categoryId)
+    if (!category || selectedIds.length === 0) return
+    const { favorites: nextFavorites, movedCount } = moveFavoritesToCategory(
+      favorites,
+      selectedIds,
+      categoryId,
+    )
+    if (movedCount === 0) {
+      pushToast(`선택한 항목이 이미 “${category.name}” 카테고리에 있습니다.`, 'info')
+      return
+    }
+    setFavorites(nextFavorites)
+    setSelectedIds([])
+    pushToast(`즐겨찾기 ${movedCount}개를 “${category.name}” 카테고리로 이동했습니다.`)
+  }
+
   const handleRestoreDefaults = () => {
     const nextCategories = createDefaultCategories()
     setFavorites(createStarterFavorites())
     setCategories(nextCategories)
     setActiveCategoryId(getDefaultCategoryId(nextCategories, ALL_CATEGORY_ID))
+    setSelecting(false)
+    setSelectedIds([])
     pushToast('기본 즐겨찾기와 카테고리를 불러왔습니다.')
   }
 
@@ -396,6 +507,8 @@ export default function App() {
     setFilter('')
     setActiveCategoryId(ALL_CATEGORY_ID)
     setArranging(false)
+    setSelecting(false)
+    setSelectedIds([])
 
     const parts = [`즐겨찾기 ${nextFavorites.length}개`]
     if (data.categories) parts.push(`카테고리 ${nextCategories.length}개`)
@@ -415,6 +528,8 @@ export default function App() {
     setFilter('')
     setActiveCategoryId(ALL_CATEGORY_ID)
     setArranging(false)
+    setSelecting(false)
+    setSelectedIds([])
 
     const parts = [`즐겨찾기 ${stats.added + stats.updated}개`]
     if (stats.categoriesCreated > 0) {
@@ -438,6 +553,8 @@ export default function App() {
     setActiveCategoryId(getDefaultCategoryId(nextCategories, ALL_CATEGORY_ID))
     setFilter('')
     setArranging(false)
+    setSelecting(false)
+    setSelectedIds([])
     setOverlay(null)
     pushToast('모든 데이터를 처음 상태로 초기화했습니다.')
   }
@@ -496,6 +613,15 @@ export default function App() {
           onRestoreDefaults={handleRestoreDefaults}
           arranging={arranging}
           onExitArrange={() => setArranging(false)}
+          selecting={selecting}
+          selectedIds={selectedIds}
+          onToggleSelecting={handleToggleSelecting}
+          onExitSelecting={handleExitSelecting}
+          onToggleSelectFavorite={handleToggleSelectFavorite}
+          onToggleSelectAllVisible={handleToggleSelectAllVisible}
+          onClearSelection={handleClearSelection}
+          onBulkDelete={handleRequestBulkDelete}
+          onBulkMoveToCategory={handleBulkMoveToCategory}
         />
       </main>
 
@@ -506,8 +632,27 @@ export default function App() {
         <span className="footer-separator" aria-hidden="true">·</span>
         <button
           type="button"
+          className={`footer-link ${selecting ? 'is-active' : ''}`}
+          onClick={handleToggleSelecting}
+          aria-pressed={selecting}
+          disabled={favorites.length === 0}
+        >
+          {selecting ? '선택 완료' : '선택 삭제'}
+        </button>
+        <span className="footer-separator" aria-hidden="true">·</span>
+        <button
+          type="button"
           className={`footer-link ${arranging ? 'is-active' : ''}`}
-          onClick={() => setArranging((current) => !current)}
+          onClick={() => {
+            setArranging((current) => {
+              const next = !current
+              if (next) {
+                setSelecting(false)
+                setSelectedIds([])
+              }
+              return next
+            })
+          }}
           aria-pressed={arranging}
         >
           {arranging ? '순서 변경 완료' : '순서 변경'}
@@ -555,6 +700,34 @@ export default function App() {
           }
           confirmLabel="삭제"
           onConfirm={confirmDelete}
+          onCancel={() => setOverlay(null)}
+        />
+      )}
+
+      {overlay?.kind === 'bulk-delete' && (
+        <ConfirmDialog
+          title="즐겨찾기 일괄 삭제"
+          description={
+            <>
+              <p>
+                선택한 <strong>{overlay.favorites.length}개</strong>의 즐겨찾기를
+                삭제할까요?
+              </p>
+              <ul className="confirm-list">
+                {overlay.favorites.slice(0, 5).map((favorite) => (
+                  <li key={favorite.id}>{favorite.name}</li>
+                ))}
+                {overlay.favorites.length > 5 && (
+                  <li className="confirm-list-more">
+                    외 {overlay.favorites.length - 5}개
+                  </li>
+                )}
+              </ul>
+              <p className="confirm-note">삭제한 즐겨찾기는 되돌릴 수 없습니다.</p>
+            </>
+          }
+          confirmLabel={`${overlay.favorites.length}개 삭제`}
+          onConfirm={confirmBulkDelete}
           onCancel={() => setOverlay(null)}
         />
       )}

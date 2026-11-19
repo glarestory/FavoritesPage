@@ -28,6 +28,7 @@ export interface Favorite {
   name: string
   url: string
   iconUrl?: string
+  iconEmoji?: string
   categoryId: string
   createdAt: number
 }
@@ -36,6 +37,7 @@ export interface FavoriteInput {
   name: string
   url: string
   iconUrl?: string
+  iconEmoji?: string
   categoryId: string
 }
 

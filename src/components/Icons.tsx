@@ -265,3 +265,23 @@ export function LinkIcon(props: IconProps) {
     </Icon>
   )
 }
+
+export function CheckSquareIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <rect x="3" y="3" width="18" height="18" rx="4" />
+      <path d="m8.5 12 2.4 2.4 4.8-4.8" />
+    </Icon>
+  )
+}
+
+export function SmileIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8.5 14.5s1.3 2 3.5 2 3.5-2 3.5-2" />
+      <circle cx="9" cy="10" r="0.9" fill="currentColor" stroke="none" />
+      <circle cx="15" cy="10" r="0.9" fill="currentColor" stroke="none" />
+    </Icon>
+  )
+}

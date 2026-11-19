@@ -22,10 +22,13 @@ interface FavoriteCardProps {
   isDragOver: boolean
   isFiltering: boolean
   arranging: boolean
+  selecting: boolean
+  selected: boolean
   canMoveLeft: boolean
   canMoveRight: boolean
   onMenuToggle: () => void
   onMenuClose: () => void
+  onToggleSelect: () => void
   onEdit: () => void
   onDelete: () => void
   onMoveLeft: () => void
@@ -48,10 +51,13 @@ export function FavoriteCard({
   isDragOver,
   isFiltering,
   arranging,
+  selecting,
+  selected,
   canMoveLeft,
   canMoveRight,
   onMenuToggle,
   onMenuClose,
+  onToggleSelect,
   onEdit,
   onDelete,
   onMoveLeft,
@@ -129,50 +135,71 @@ export function FavoriteCard({
         menuOpen ? 'is-menu-open' : '',
         isDragging ? 'is-dragging' : '',
         isDragOver ? 'is-drag-over' : '',
-        arranging ? 'is-arranging' : '',
+        arranging && !selecting ? 'is-arranging' : '',
+        selecting ? 'is-selecting' : '',
+        selecting && selected ? 'is-selected' : '',
       ]
         .filter(Boolean)
         .join(' ')}
       data-menu-root
-      draggable={!isFiltering}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      onDragEnd={onDragEnd}
+      draggable={!isFiltering && !selecting}
+      onDragStart={selecting ? undefined : onDragStart}
+      onDragOver={selecting ? undefined : onDragOver}
+      onDragLeave={selecting ? undefined : onDragLeave}
+      onDrop={selecting ? undefined : onDrop}
+      onDragEnd={selecting ? undefined : onDragEnd}
     >
-      {arranging && (
+      {!selecting && arranging && (
         <span className="drag-grip" aria-hidden="true">
           <GripVerticalIcon size={14} />
         </span>
       )}
-      <a
-        className="favorite-link"
-        href={favorite.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        draggable={false}
-        aria-label={`${initial} ${favorite.name} 새 탭에서 열기`}
-        title={`${favorite.name} — ${favorite.url}`}
-        onClick={onMenuClose}
-      >
-        <FavoriteIcon favorite={favorite} />{' '}
-        <span className="favorite-name">{favorite.name}</span>
-      </a>
-      <button
-        ref={registerTrigger}
-        type="button"
-        className="favorite-menu-trigger"
-        aria-label={`${favorite.name} 메뉴`}
-        aria-haspopup="menu"
-        aria-expanded={menuOpen}
-        aria-controls={menuOpen ? menuId : undefined}
-        title="편집 및 순서 메뉴"
-        onClick={onMenuToggle}
-      >
-        <MoreHorizontalIcon size={17} />
-      </button>
-      {menuOpen && (
+      {selecting ? (
+        <label
+          className="favorite-select-surface"
+          title={`${favorite.name} — ${favorite.url}`}
+        >
+          <input
+            type="checkbox"
+            className="card-select-checkbox"
+            checked={selected}
+            onChange={onToggleSelect}
+            aria-label={`${favorite.name} 선택`}
+          />
+          <FavoriteIcon favorite={favorite} />{' '}
+          <span className="favorite-name">{favorite.name}</span>
+        </label>
+      ) : (
+        <a
+          className="favorite-link"
+          href={favorite.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          draggable={false}
+          aria-label={`${initial} ${favorite.name} 새 탭에서 열기`}
+          title={`${favorite.name} — ${favorite.url}`}
+          onClick={onMenuClose}
+        >
+          <FavoriteIcon favorite={favorite} />{' '}
+          <span className="favorite-name">{favorite.name}</span>
+        </a>
+      )}
+      {!selecting && (
+        <button
+          ref={registerTrigger}
+          type="button"
+          className="favorite-menu-trigger"
+          aria-label={`${favorite.name} 메뉴`}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-controls={menuOpen ? menuId : undefined}
+          title="편집 및 순서 메뉴"
+          onClick={onMenuToggle}
+        >
+          <MoreHorizontalIcon size={17} />
+        </button>
+      )}
+      {!selecting && menuOpen && (
         <div
           ref={registerMenu}
           id={menuId}

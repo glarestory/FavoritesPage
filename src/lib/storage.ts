@@ -5,6 +5,10 @@ import {
   validateLocalImageDataUrl,
 } from './background-image.mjs'
 import {
+  normalizeIconEmoji,
+  validateLocalIconDataUrl,
+} from './favorite-icon.mjs'
+import {
   ALL_CATEGORY_ID,
   ALL_CATEGORY_LABEL,
   createDefaultCategories,
@@ -83,9 +87,17 @@ function sanitizeFavorites(value: unknown[], categories: Category[]): SanitizedF
 
     let iconUrl: string | undefined
     if (typeof entry.iconUrl === 'string' && entry.iconUrl.trim()) {
-      const validatedIcon = validateWebUrl(entry.iconUrl, '아이콘 URL')
-      if (validatedIcon.ok) iconUrl = validatedIcon.value
+      const trimmedIcon = entry.iconUrl.trim()
+      if (trimmedIcon.startsWith('data:')) {
+        const validatedLocalIcon = validateLocalIconDataUrl(trimmedIcon)
+        if (validatedLocalIcon.ok) iconUrl = validatedLocalIcon.value
+      } else {
+        const validatedIcon = validateWebUrl(trimmedIcon, '아이콘 URL')
+        if (validatedIcon.ok) iconUrl = validatedIcon.value
+      }
     }
+
+    const iconEmoji = normalizeIconEmoji(entry.iconEmoji)
 
     const rawCategoryId =
       typeof entry.categoryId === 'string' ? entry.categoryId.trim() : ''
@@ -109,7 +121,8 @@ function sanitizeFavorites(value: unknown[], categories: Category[]): SanitizedF
       id,
       name,
       url: validatedUrl.value,
-      iconUrl,
+      ...(iconUrl ? { iconUrl } : {}),
+      ...(iconEmoji ? { iconEmoji } : {}),
       categoryId,
       createdAt,
     })

@@ -70,18 +70,60 @@ export function getSiteInitial(name: string): string {
 
 export interface AvatarTone {
   background: string
+  gradient: string
   color: string
+  border: string
 }
 
 const AVATAR_TONES: AvatarTone[] = [
-  { background: '#e7efff', color: '#2563eb' },
-  { background: '#fde9ea', color: '#dc2626' },
-  { background: '#fdf1dc', color: '#b45309' },
-  { background: '#e6f6ec', color: '#15803d' },
-  { background: '#f3e9ff', color: '#7e22ce' },
-  { background: '#e2f5f8', color: '#0e7490' },
-  { background: '#ffe9f2', color: '#be185d' },
-  { background: '#eceae4', color: '#57534e' },
+  {
+    background: '#e7efff',
+    gradient: 'linear-gradient(145deg, #f2f6ff 0%, #dce8ff 100%)',
+    color: '#2563eb',
+    border: 'rgba(37, 99, 235, 0.16)',
+  },
+  {
+    background: '#fde9ea',
+    gradient: 'linear-gradient(145deg, #fff2f3 0%, #fbd9dc 100%)',
+    color: '#dc2626',
+    border: 'rgba(220, 38, 38, 0.16)',
+  },
+  {
+    background: '#fdf1dc',
+    gradient: 'linear-gradient(145deg, #fff8eb 0%, #fae6c3 100%)',
+    color: '#b45309',
+    border: 'rgba(180, 83, 9, 0.16)',
+  },
+  {
+    background: '#e6f6ec',
+    gradient: 'linear-gradient(145deg, #f2fbf5 0%, #d6f1e0 100%)',
+    color: '#15803d',
+    border: 'rgba(21, 128, 61, 0.16)',
+  },
+  {
+    background: '#f3e9ff',
+    gradient: 'linear-gradient(145deg, #f9f3ff 0%, #e7d6ff 100%)',
+    color: '#7e22ce',
+    border: 'rgba(126, 34, 206, 0.16)',
+  },
+  {
+    background: '#e2f5f8',
+    gradient: 'linear-gradient(145deg, #effbfc 0%, #cdeef3 100%)',
+    color: '#0e7490',
+    border: 'rgba(14, 116, 144, 0.16)',
+  },
+  {
+    background: '#ffe9f2',
+    gradient: 'linear-gradient(145deg, #fff3f8 0%, #ffd8e8 100%)',
+    color: '#be185d',
+    border: 'rgba(190, 24, 93, 0.16)',
+  },
+  {
+    background: '#eceae4',
+    gradient: 'linear-gradient(145deg, #f6f4ef 0%, #e3dfd6 100%)',
+    color: '#57534e',
+    border: 'rgba(87, 83, 78, 0.16)',
+  },
 ]
 
 export function getAvatarTone(seed: string): AvatarTone {

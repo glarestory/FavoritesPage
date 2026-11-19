@@ -1,10 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DragEvent as ReactDragEvent } from 'react'
 import type { Category, Favorite } from '../types'
 import { ALL_CATEGORY_ID, ALL_CATEGORY_LABEL } from '../lib/categories'
+import { getVisibleSelectionState } from '../lib/selection.mjs'
 import { CategoryBar } from './CategoryBar'
 import { FavoriteCard } from './FavoriteCard'
-import { GripVerticalIcon, PlusIcon, SearchIcon, XIcon } from './Icons'
+import {
+  CheckSquareIcon,
+  GripVerticalIcon,
+  PlusIcon,
+  SearchIcon,
+  TrashIcon,
+  XIcon,
+} from './Icons'
 
 interface FavoritesGridProps {
   allFavorites: Favorite[]
@@ -25,6 +33,15 @@ interface FavoritesGridProps {
   onRestoreDefaults: () => void
   arranging: boolean
   onExitArrange: () => void
+  selecting: boolean
+  selectedIds: string[]
+  onToggleSelecting: () => void
+  onExitSelecting: () => void
+  onToggleSelectFavorite: (favoriteId: string) => void
+  onToggleSelectAllVisible: (visibleIds: string[]) => void
+  onClearSelection: () => void
+  onBulkDelete: () => void
+  onBulkMoveToCategory: (categoryId: string) => void
 }
 
 export function FavoritesGrid({
@@ -46,13 +63,58 @@ export function FavoritesGrid({
   onRestoreDefaults,
   arranging,
   onExitArrange,
+  selecting,
+  selectedIds,
+  onToggleSelecting,
+  onExitSelecting,
+  onToggleSelectFavorite,
+  onToggleSelectAllVisible,
+  onClearSelection,
+  onBulkDelete,
+  onBulkMoveToCategory,
 }: FavoritesGridProps) {
   const isFiltering = filter.trim().length > 0
   const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
   const [draggedId, setDraggedId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [bulkCategoryId, setBulkCategoryId] = useState<string>('')
   const triggerRefs = useRef(new Map<string, HTMLButtonElement>())
   const menuRefs = useRef(new Map<string, HTMLDivElement>())
+  const selectAllCheckboxRef = useRef<HTMLInputElement>(null)
+
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const filteredIds = useMemo(
+    () => filteredFavorites.map((favorite) => favorite.id),
+    [filteredFavorites],
+  )
+  const { allVisibleSelected, someVisibleSelected } = useMemo(
+    () => getVisibleSelectionState(selectedIds, filteredIds),
+    [selectedIds, filteredIds],
+  )
+
+  useEffect(() => {
+    if (!selectAllCheckboxRef.current) return
+    selectAllCheckboxRef.current.indeterminate = someVisibleSelected
+  }, [someVisibleSelected, selecting])
+
+  useEffect(() => {
+    if (categories.length === 0) {
+      setBulkCategoryId('')
+      return
+    }
+    const preferred =
+      categories.find((category) => category.id !== activeCategoryId)?.id ??
+      categories[0]!.id
+    setBulkCategoryId((current) =>
+      current && categories.some((category) => category.id === current) && current !== activeCategoryId
+        ? current
+        : preferred,
+    )
+  }, [categories, activeCategoryId])
+
+  useEffect(() => {
+    if (selecting) setMenuOpenId(null)
+  }, [selecting])
 
   const activeCategoryName =
     activeCategoryId === ALL_CATEGORY_ID
@@ -218,39 +280,138 @@ export function FavoritesGrid({
           <p className="grid-count" aria-live="polite">
             {countLabel}
           </p>
-          <div className="filter-field">
-            <SearchIcon size={16} className="filter-icon" />
-            <label className="sr-only" htmlFor="favorite-filter">
-              즐겨찾기 이름 또는 URL 필터
-            </label>
-            <input
-              id="favorite-filter"
-              type="search"
-              value={filter}
-              placeholder="즐겨찾기 필터"
-              autoComplete="off"
-              onChange={(event) => onFilterChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === 'Escape' && filter) {
-                  event.preventDefault()
-                  onFilterChange('')
-                }
-              }}
-            />
-            {filter && (
+          <div className="grid-toolbar-actions">
+            {allFavorites.length > 0 && (
               <button
                 type="button"
-                className="filter-clear"
-                onClick={() => onFilterChange('')}
-                aria-label="즐겨찾기 필터 지우기"
+                className={`select-mode-button ${selecting ? 'is-active' : ''}`}
+                aria-pressed={selecting}
+                onClick={onToggleSelecting}
               >
-                <XIcon size={15} />
+                <CheckSquareIcon size={15} />
+                <span>{selecting ? '선택 완료' : '선택'}</span>
               </button>
             )}
+            <div className="filter-field">
+              <SearchIcon size={16} className="filter-icon" />
+              <label className="sr-only" htmlFor="favorite-filter">
+                즐겨찾기 이름 또는 URL 필터
+              </label>
+              <input
+                id="favorite-filter"
+                type="search"
+                value={filter}
+                placeholder="즐겨찾기 필터"
+                autoComplete="off"
+                onChange={(event) => onFilterChange(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape' && filter) {
+                    event.preventDefault()
+                    onFilterChange('')
+                  }
+                }}
+              />
+              {filter && (
+                <button
+                  type="button"
+                  className="filter-clear"
+                  onClick={() => onFilterChange('')}
+                  aria-label="즐겨찾기 필터 지우기"
+                >
+                  <XIcon size={15} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        {arranging && (
+        {selecting && (
+          <div
+            className="selection-banner"
+            role="region"
+            aria-label="선택 항목 일괄 작업"
+          >
+            <div className="selection-banner-left">
+              <label className="selection-check-all">
+                <input
+                  ref={selectAllCheckboxRef}
+                  type="checkbox"
+                  className="selection-checkbox"
+                  checked={allVisibleSelected}
+                  disabled={filteredFavorites.length === 0}
+                  onChange={() => onToggleSelectAllVisible(filteredIds)}
+                />
+                <span>현재 목록 전체 선택</span>
+              </label>
+              <span className="selection-count" aria-live="polite">
+                {selectedIds.length > 0
+                  ? `${selectedIds.length}개 선택됨`
+                  : '삭제하거나 이동할 카드를 선택하세요'}
+              </span>
+              {selectedIds.length > 0 && (
+                <button
+                  type="button"
+                  className="text-button selection-clear-button"
+                  onClick={onClearSelection}
+                >
+                  선택 해제
+                </button>
+              )}
+            </div>
+            <div className="selection-banner-actions">
+              {categories.length > 1 && (
+                <div className="selection-move-group">
+                  <label className="sr-only" htmlFor="bulk-move-category">
+                    이동할 카테고리
+                  </label>
+                  <select
+                    id="bulk-move-category"
+                    className="selection-category-select"
+                    value={bulkCategoryId}
+                    disabled={selectedIds.length === 0}
+                    onChange={(event) => setBulkCategoryId(event.target.value)}
+                  >
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="button button--secondary button--compact"
+                    disabled={selectedIds.length === 0 || !bulkCategoryId}
+                    onClick={() => {
+                      if (bulkCategoryId) onBulkMoveToCategory(bulkCategoryId)
+                    }}
+                  >
+                    이동
+                  </button>
+                </div>
+              )}
+              <button
+                type="button"
+                className="button button--danger button--compact"
+                disabled={selectedIds.length === 0}
+                onClick={onBulkDelete}
+              >
+                <TrashIcon size={14} />
+                <span>
+                  삭제{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="text-button"
+                onClick={onExitSelecting}
+              >
+                완료
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!selecting && arranging && (
           <div className="arrange-banner" role="status">
             <GripVerticalIcon size={17} />
             <p>
@@ -350,6 +511,8 @@ export function FavoritesGrid({
                     isDragOver={dragOverId === favorite.id && draggedId !== favorite.id}
                     isFiltering={isFiltering}
                     arranging={arranging}
+                    selecting={selecting}
+                    selected={selectedIdSet.has(favorite.id)}
                     canMoveLeft={visibleIndex > 0}
                     canMoveRight={
                       visibleIndex >= 0 && visibleIndex < visibleFavorites.length - 1
@@ -360,6 +523,7 @@ export function FavoritesGrid({
                       )
                     }
                     onMenuClose={closeMenu}
+                    onToggleSelect={() => onToggleSelectFavorite(favorite.id)}
                     onEdit={() => handleEdit(favorite)}
                     onDelete={() => handleDelete(favorite)}
                     onMoveLeft={() => handleMove(favorite, -1)}
@@ -386,7 +550,7 @@ export function FavoritesGrid({
                   />
                 )
               })}
-              {!isFiltering && (
+              {!isFiltering && !selecting && (
                 <li className="favorite-card add-card-item">
                   <button type="button" className="add-card" onClick={onOpenAdd}>
                     <span className="add-card-icon" aria-hidden="true">
